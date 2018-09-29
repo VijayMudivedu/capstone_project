@@ -204,12 +204,8 @@ cor.plot(complications_df_final[,-1],numbers = T,show.legend = F,cex = 0.7,xlas 
 - Considering the signficant variable measures from these Complications Dataset
 
 ```{r}
-zvar1 <- which(names(complications_df_spread) %in% c("Provider.ID","PSI_90_SAFETY","COMP_HIP_KNEE","PSI_4_SURG_COMP"))
-
-complications_df_final <- complications_df_spread[,zvar1]
-
-str(complications_df_final)
-
+zvar1 <- which(names(complications_df_final) %in% c("Provider.ID","PSI_90_SAFETY","COMP_HIP_KNEE","PSI_4_SURG_COMP"))
+complications_df_final <- complications_df_final[,zvar1]
 ```
 
 # Analysis for Healthcare Associated Infections - For Hosptial
@@ -306,11 +302,16 @@ ggplot(data = hai_df_cleaned,aes(x = Measure.ID,y = Score)) +
   geom_col(position = position_stack(),na.rm = TRUE) + xlab("Measure.ID") + labs(title = "Hospital Associated Infections by Measure and Score") +
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1))
 
+```
+
+
+```{r}
 ggplot(data = hai_df_cleaned,aes(x = Measure.ID)) + 
   geom_bar(position = position_stack(),na.rm = TRUE) + xlab("Measure.ID") + labs(title = "Hospital Associated Infections by Measure by Hospital Count") +
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1))
 
 ```
+
 
 - selecting the required measures for analysis
 
@@ -337,7 +338,6 @@ head(safety_of_care_group)
 
 ```{r}
 hcaphs_df <- read.csv(file = "ValidFiles/HCAHPS - Hospital.csv",header = TRUE,check.names = TRUE,na.strings = c("Not Available","Not Applicable",""))
-head(hcaphs_df)
 ```
 
 # removing the demographic columns, Mesaure Start Date and measure end data columns
@@ -345,7 +345,6 @@ head(hcaphs_df)
 ```{r}
 zdemographics
 hcaphs_df_cleaned <- hcaphs_df[,-which(names(hcaphs_df) %in% zdemographics)]
-head(hcaphs_df_cleaned)
 ```
 
 - Extracting the Measure IDs that are of importance are:
@@ -365,7 +364,6 @@ hcaphs_df_measures <- hcaphs_df_cleaned %>% filter(hcaphs_df_cleaned$HCAHPS.Meas
 hcaphs_df_measures$HCAHPS.Measure.ID <- as.character(hcaphs_df_measures$HCAHPS.Measure.ID)
 hcaphs_df_measures$HCAHPS.Measure.ID <- str_replace(string = hcaphs_df_measures$HCAHPS.Measure.ID,pattern = "_LINEAR_SCORE",replacement = "")
 hcaphs_df_measures$HCAHPS.Measure.ID <- as.factor(hcaphs_df_measures$HCAHPS.Measure.ID)
-str(hcaphs_df_measures)
 ```
 
 
@@ -421,7 +419,6 @@ head(master_df)
 ```{r}
 time_and_eff_care_df <- read.csv(file = "ValidFiles/Timely and Effective Care - Hospital.csv",header = T,check.names = T,stringsAsFactors = T,na.strings = c("Not Available",""))
 str(time_and_eff_care_df)
-head(time_and_eff_care_df)
 ```
 
 # cleaning the demographic variables from the dataset
@@ -755,12 +752,18 @@ cor.plot(op_imaging_eff_final[,-1],show.legend = F,xlas = 2,keep.par = T,numbers
 ```{r}
 master_df <- merge(x = master_df,y = op_imaging_eff_final,by = intersect(x = names(master_df),y = names(op_imaging_eff_final)),all = TRUE) #%>% head()
 ```
+
+Next steps:
 1. check outliers in the measures
 2. imputing missing values
 
 
+- Replacing NAs in the target variable Hospital.Overall.Rating to "Missing"
+
 ```{r}
-master_df[is.na(master_df$Hospital.overall.rating),] %>% summary()
+ratings <- as.character(master_df$Hospital.overall.rating)
+ratings[which(is.na(ratings))] <- "Missing"
+master_df$Hospital.overall.rating <- factor(ratings)
 ```
 
 # which rows have all NAs?
@@ -782,18 +785,6 @@ master_df_imputed <- mice(data = master_df[,-c(1,2)],seed = 100,maxit = 5,m = 5)
 master_df_imputed_final <-  complete(data = master_df_imputed,action = 5)
 head(master_df_imputed_final)
 ```
-
-- Replacing NAs in the target variable Hospital.Overall.Rating to "Missing"
-
-```{r}
-ratings <- as.character(master_df$Hospital.overall.rating)
-
-ratings[which(is.na(ratings))] <- "Missing"
-master_df$Hospital.overall.rating <- factor(ratings)
-
-
-```
-
 
 # Spliting the dataset into training and testing 
 
@@ -834,21 +825,15 @@ train_control_rf <- trainControl(method = "repeatedcv",
 # Tuning grid parameters of Random Forest
 tuning_grid_rf <- expand.grid(.mtry = round(sqrt(ncol(train_df[,-1]))),ntree = seq(100,1000,100)) 
 
+# training the random forest with training dataset
 model_rf <- randomForest(Hospital.overall.rating ~.,
                          data = train_df[,-1],
-                         #method = "rf",
                          trControl = train_control_rf,
                          tuneGrid = tuning_grid_rf,
                          metric = "auc",
-                         #do.trace = TRUE,
-                         #importance = TRUE,
                          na.action = na.roughfix,
-                         seed = 100
-                         )
+                         seed = 100)
 model_rf
-summary(model_rf)
-
-
 ```
 
 * Prediction using the Random Forest
