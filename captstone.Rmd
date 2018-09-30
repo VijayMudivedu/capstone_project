@@ -10,6 +10,13 @@ output:
     toc: yes
 ---
 
+```{r}
+#install.packages("mice")
+#install.packages("psych")
+#install.packages("doParallel")
+```
+
+
 ```{r setup, include=FALSE}
 library(knitr)
 knitr::opts_chunk$set(echo = TRUE)
@@ -38,8 +45,12 @@ zdemogrphic_vars <- which(names(general_info) %in% zdemographics)
 
 zvar1 <- c("Hospital.Type","Hospital.Ownership","Emergency.Services","Meets.criteria.for.meaningful.use.of.EHRs")
 zvar2 <- which(names(general_info) %in% zvar1)
-
 general_info_cleaned <- general_info[,-c(zdemogrphic_vars,zvar2)]
+```
+
+# Replacing the empty values in the target variable as "Missing"
+```{r}
+general_info_cleaned$Hospital.overall.rating[which(is.na(general_info_cleaned$Hospital.overall.rating))] <- "Missing"
 general_info_cleaned$Hospital.overall.rating <- as.factor(general_info_cleaned$Hospital.overall.rating)
 ```
 
@@ -48,29 +59,34 @@ general_info_cleaned$Hospital.overall.rating <- as.factor(general_info_cleaned$H
 * footnote with levels are inducing the NAs in the dataset: 
     + "Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs" is inducing the NAs across the dataset
     + "Data suppressed by CMS for one or more quarters"
-
-* This enables us to conclude that the provider ids related this level can be purged from the dataset
-
-```{r}
-general_info_cleaned %>% filter(general_info_cleaned$Hospital.overall.rating.footnote %in% 
-           c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
-             "Data suppressed by CMS for one or more quarters")) %>% group_by(Hospital.overall.rating,Mortality.national.comparison,Readmission.national.comparison,Safety.of.care.national.comparison,Efficient.use.of.medical.imaging.national.comparison,Timeliness.of.care.national.comparison,Effectiveness.of.care.national.comparison,Patient.experience.national.comparison) %>% 
-  summarise(count_rws = n()) %>% t()
-
-general_info_cleaned <- general_info_cleaned %>% 
-  filter(!general_info_cleaned$Hospital.overall.rating.footnote %in% 
-           c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
-             "Data suppressed by CMS for one or more quarters"))
-
-```
+* This concludes that the provider ids related this level can be purged from the dataset
 
 * Similarly, "Data suppressed by CMS for one or more quarters" also cannot be used for analysis as this is inducing the NAs across the datasets, which mandates to purge the dataset with missing NAs
 
 ```{r}
-barplot(prop.table(table(general_info_cleaned$Hospital.overall.rating)))
+general_info_cleaned %>% filter(general_info_cleaned$Hospital.overall.rating.footnote %in%
+           c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
+             "Data suppressed by CMS for one or more quarters","Data suppressed by CMS for one or more quarters","Results are not available for this reporting period")) %>% group_by(Mortality.national.comparison,Readmission.national.comparison,Safety.of.care.national.comparison,Efficient.use.of.medical.imaging.national.comparison,Timeliness.of.care.national.comparison,Effectiveness.of.care.national.comparison,Patient.experience.national.comparison) %>%
+  summarise(count_rws = n()) %>% t()
+```
+
+* Filtering the footnotes that are leading to NAs Hospital Ratings
+
+```{r}
+general_info_cleaned <- general_info_cleaned %>% 
+  filter(!general_info_cleaned$Hospital.overall.rating.footnote %in% 
+           c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
+             "Data suppressed by CMS for one or more quarters","Results are not available for this reporting period"))
 ```
 
 * Barplot of the ratings show that the Hospital rating has a gaussian distribution
+```{r}
+ggplot(data = general_info_cleaned,aes(x = Hospital.overall.rating)) + 
+  geom_bar(na.rm = T, fill = "steelblue") + geom_text(stat = "count", aes(label = paste0(round(..count../sum(..count..),3)*100)),hjust = 0) + 
+  labs(title = "% Distrbution of the Class Variable, Hospital Ratings ") + 
+  theme(plot.title = element_text(hjust = 0.5),plot.background = element_blank(),axis.title.y = element_blank(),
+        panel.background = element_blank(),axis.text.y = element_text(hjust = 1)) + coord_flip()
+```
 
 * checking the level footnote level of Hospital Rating 
   - "There are too few measures or measure groups reported to calculate a star rating or measure group score"
@@ -79,8 +95,7 @@ barplot(prop.table(table(general_info_cleaned$Hospital.overall.rating)))
 ```{r}
 general_info_cleaned %>% 
   filter(general_info_cleaned$Hospital.overall.rating.footnote %in% 
-           c("Results are not available for this reporting period",
-             "There are too few measures or measure groups reported to calculate a star rating or measure group score")) %>% summary()
+           c("There are too few measures or measure groups reported to calculate a star rating or measure group score")) %>% summary()
 ```
 * The above specific additional footnotes also contribute to the NAs in Hospital Overall Rating with multilevel dependency on the other groups. 
 * For example, specified ones below contribue less to NAs, compared to Mortality, Safety of care, Readmission, Efficient Use of medical Imaging.
@@ -89,8 +104,7 @@ general_info_cleaned %>%
 ```{r}
 general_info_cleaned <- general_info_cleaned %>% 
   filter(!general_info_cleaned$Hospital.overall.rating.footnote %in% 
-           c("Results are not available for this reporting period",
-             "There are too few measures or measure groups reported to calculate a star rating or measure group score")) 
+           c("There are too few measures or measure groups reported to calculate a star rating or measure group score")) 
 
 summary(general_info_cleaned)
 
@@ -147,7 +161,6 @@ these rows can be imputed from analysis.
 zvar1 <- is.na(complications_df$Footnote) # Blank Footnotes
 zvar2 <- which(names(complications_df_cleaned) %in% "Footnote")
 complications_df_cleaned_footnote_nas <- complications_df_cleaned[zvar1,-zvar2]
-
 summary(complications_df_cleaned_footnote_nas)
 ```
 - Imputing the "NAs" resulted in inducing the variability in each of the variables. 
@@ -156,41 +169,28 @@ summary(complications_df_cleaned_footnote_nas)
 
 ```{r}
 library(reshape2)
+
 complications_df_cleaned_footnote_nas %>% group_by(Measure.ID) %>% 
-  summarise(cnt_rws = n(), Sum_score = sum(Score,na.rm = T),
-            mean_Score = mean(Score,na.rm = T)) %>% 
+  summarise(cnt_rws = n(), mean_Score = round(mean(Score,na.rm = T))) %>% 
   arrange(desc(cnt_rws)) %>% melt(value.name = c("value")) %>%
-  ggplot(aes(x = Measure.ID,y = value)) + geom_col() + facet_wrap(facets = ~ variable,scales = "free",ncol = 3) + 
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5,hjust = 1))
-
-
-complications_df_cleaned_footnote_nas[is.na(complications_df_cleaned_footnote_nas$Denominator),] %>% summary()
-
+  ggplot(aes(x = Measure.ID,y = value)) + geom_col(fill = "steelblue") + geom_text(aes(label = value),hjust = 1,vjust = 0.5,angle = 90) +
+  facet_wrap(facets = ~ variable,scales = "free",ncol = 3) +  labs(title = "Complications measure") +
+  theme(axis.text.x = element_text(angle = 60,vjust = 1,hjust = 1), plot.title = element_text(hjust = 0.5))
 ```
 
-- Significant Measures from these measure Ids are "PSI_90_SAFETY","PSI_4_SURG_COMP" "COMP_HIP_KNEE" is the other significant measure
+- Significant Measures from this dataset measures are "PSI_90_SAFETY","PSI_4_SURG_COMP" "COMP_HIP_KNEE"
 
 - rejecting the Denominoator, Lower Estimate, Higher Estimate, Compared.to.National variables
 - Important measures are 
 
 ```{r}
-
 zvar1 <- c( "Provider.ID", "Measure.ID", "Score")
 zvar2 <- which(names(complications_df_cleaned_footnote_nas) %in% zvar1)
 
 complications_df_final <-  complications_df_cleaned_footnote_nas[,zvar2] %>%  spread(key = Measure.ID,value = Score)
 summary(complications_df_final)
-
-```
-
-```{r}
-library(psych)
-pairs.panels(x = complications_df_final[2:ncol(complications_df_final)],
-             bg = rainbow(n = 12),
-             smooth = TRUE,
-             ellipses = TRUE,pch = 21,cex.cor = 0.05,cex.labels = 0.5)
-cor.plot(complications_df_final[,-1],numbers = T,show.legend = F,cex = 0.7,xlas = 2,cex.axis = 0.7)
-
+# PSI_8_POST_HIP data is stale with no contribution to the overall score and  minimal.
+complications_df_final <- complications_df_final[,-which(names(complications_df_final) %in% "PSI_8_POST_HIP")]
 ```
 
 - Some of the variables exhibit that high variability compared to other measures are for example, "PSI_90_SAFETY","COMP_HIP_KNEE", "PSI_4_SURG_COMP" 
@@ -199,27 +199,27 @@ cor.plot(complications_df_final[,-1],numbers = T,show.legend = F,cex = 0.7,xlas 
 ```{r}
 zvar1 <- which(names(complications_df_final) %in% c("Provider.ID","PSI_90_SAFETY","COMP_HIP_KNEE","PSI_4_SURG_COMP"))
 complications_df_final <- complications_df_final[,zvar1]
+library(psych)
+pairs.panels(x = complications_df_final[2:ncol(complications_df_final)], main = "Complications dataset correlation ",
+             bg = rainbow(n = 12),smooth = TRUE, ellipses = TRUE,pch = 21,cex.cor = 0.85,cex.labels = 0.6)
+
 ```
 
 # Analysis for Healthcare Associated Infections - For Hosptial
 
 ```{r}
 hai_df <- read.csv(file = "~/Google Drive/_OneDrive_Atimi_Software/Upgrad/_Upgrad/Capstone_project/capstone_project/ValidFiles/Healthcare Associated Infections - Hospital.csv",na.strings = c("Not Available",""))
-head(hai_df)
 ```
 
 ```{r}
 summary(hai_df)
 ```
 
-
-- remove the demographic variables, Address, City, State, ZIP.Code, County.Name,Phone.Number,Footnote
+- Removing the demographic variables, Address, City, State, ZIP.Code, County.Name,Phone.Number,Footnote
 
 ```{r}
 zdemographics <- c("Hospital.Name","Address","City","State","County.Name","Phone.Number","ZIP.Code","Measure.Start.Date","Measure.End.Date")
 hai_df_cleaned <- hai_df[,-which(names(hai_df) %in% c(zdemographics))]
-str(hai_df_cleaned)
-summary(hai_df_cleaned)
 ```
 
 - Imputing the NAs from the Hospital Associated Infections dataset - Variables, Footnote with values
@@ -230,31 +230,25 @@ hai_df_cleaned %>% group_by(Footnote) %>% summarise(count_rows = n(),score_total
 - Footnote variable that briefs out the imperfections associated with the score for each related level
 - Considering the blank in the footnotes that carry more weightage to the score
 
-
 ```{r}
 zvar1 <- which(names(hai_df_cleaned) %in% c("Footnote"))
 hai_df_cleaned <- hai_df_cleaned[is.na(hai_df_cleaned$Footnote),-zvar1]  
-
-# removing the invalid footnotes and Footnote variable that do not contribute zvar
-summary(hai_df_cleaned)
+summary(hai_df_cleaned) # running the summary on the after removing the invalid footnotes
 ```
 
 # determine the outliers in the Score
 
 ```{r}
-ggplot(data = hai_df_cleaned,aes(x = hai_df_cleaned$Measure.ID,y = Score)) + 
-  geom_boxplot() + xlab("Measure.ID") +
-  theme(axis.text.x = element_text(angle = 90))
+hai_df_cleaned %>% group_by(Measure.ID) %>% summarise(count_rows = n(), per_mean_score = mean(Score)*100) %>%
+ggplot(aes(x = Measure.ID,y = count_rows)) +
+  geom_col(fill = "steelblue") + geom_text(aes(label = count_rows),vjust = -0.5,angle = 0) +
+  xlab("Measure.ID") + labs(title = "Healthcare Associated Infections") +
+  theme(axis.text.x = element_text(angle = 45,hjust = 1,vjust = 1),plot.title = element_text(hjust = 0.5))
 
 ```
 
 * There are abnormal outliers in the dataset from the measure IDs HAI_1_DOPC_Days, besides this they do not contribute to the overall score
-- Summarise the distribution of the mueasures. 
-
-
-```{r}
-hai_df %>% group_by(Measure.Name,Measure.ID) %>% summarise(cnt_rws = n())
-```
+- Summarising the distribution of the measures. 
 
 - A central line-associated bloodstream infection (CLABSI) is a serious infection that occurs when germs (usually bacteria or viruses) enter the bloodstream through the central line. Healthcare providers must follow a strict protocol when inserting the line to make sure the line remains sterile and a CLABSI does not occur. In addition to inserting the central line properly, healthcare providers must use stringent infection control practices each time they check the line or change the dressing. Patients who get a CLABSI have a fever, and might also have red skin and soreness around the central line. If this happens, healthcare providers can do tests to learn if there is an infection present.
 
@@ -285,22 +279,9 @@ hai_df_cleaned <- hai_df_cleaned[which(hai_df_cleaned$Measure.ID %in% hai_measur
 ```
 
 ```{r}
-ggplot(data = hai_df_cleaned,aes(x = Measure.ID,y = Score)) + 
-  geom_boxplot(na.rm = T) + xlab("Measure.ID") +
-  theme(axis.text.x = element_text(angle = 90))
-```
-
-```{r}
-ggplot(data = hai_df_cleaned,aes(x = Measure.ID,y = Score)) + 
-  geom_col(position = position_stack(),na.rm = TRUE) + xlab("Measure.ID") + labs(title = "Hospital Associated Infections by Measure and Score") +
-  theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1))
-
-```
-
-
-```{r}
 ggplot(data = hai_df_cleaned,aes(x = Measure.ID)) + 
-  geom_bar(position = position_stack(),na.rm = TRUE) + xlab("Measure.ID") + labs(title = "Hospital Associated Infections by Measure by Hospital Count") +
+  geom_bar(fill = "steelblue",na.rm = TRUE) + xlab("Measure.ID") + geom_text(stat = "count",aes(label = ..count..),vjust = -.1) +
+  labs(title = "Hospital Associated Infections by Measure by Hospital Count") +
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1))
 
 ```
@@ -314,20 +295,24 @@ zvar2 <- which(names(hai_df_cleaned) %in% zvar1)
 
 hai_df_final <- hai_df_cleaned[,zvar2] %>% spread(key = "Measure.ID",value = "Score")
 summary(hai_df_final)
+```
+
+```{r}
+pairs.panels(x = hai_df_final[,-1],cex.cor = 0.5,cex.labels = 0.9,ellipses = TRUE,pch = 21,bg = rainbow(length(zvar1)), 
+             main = "Hospital Patient Safety Group variable correlation" )
 
 ```
 
-# Creating a Patient Safety group
+- The hospital associated infections group groups variable sare
 
+- merging the data complications final with general information dataset 
 ```{r}
 gen_inf_compli_df <- merge(x = general_info_final,y = complications_df_final,all = TRUE, by = intersect(x = names(general_info_final),y = names(complications_df_final)))
 
 safety_of_care_group <- merge(x = gen_inf_compli_df,y = hai_df_final,all = TRUE,by = intersect(x = names(gen_inf_compli_df),y = names(hai_df_final)))
-
-head(safety_of_care_group)
 ```
 
-# ANALYSIS OF HCAPHS SURVEY
+# Analysis of HCAPHS dataset
 
 ```{r}
 hcaphs_df <- read.csv(file = "ValidFiles/HCAHPS - Hospital.csv",header = TRUE,check.names = TRUE,na.strings = c("Not Available","Not Applicable",""))
@@ -340,16 +325,12 @@ zdemographics
 hcaphs_df_cleaned <- hcaphs_df[,-which(names(hcaphs_df) %in% zdemographics)]
 ```
 
-- Extracting the Measure IDs that are of importance are:
-
+- Extracting the Measure IDs that are of importance from:
 H_COMP_1_LINEAR_SCORE, H_COMP_2_LINEAR_SCORE, H_COMP_3_LINEAR_SCORE, H_COMP_4_LINEAR_SCORE, H_COMP_5_LINEAR_SCORE, 
 H_COMP_6_LINEAR_SCORE, H_COMP_7_LINEAR_SCORE, H_HSP_RATING_LINEAR_SCORE, H_QUIET_LINEAR_SCORE,H_RECMND_LINEAR_SCORE, H_CLEAN_LINEAR_SCORE, 
 
-H_COMP_1, H_COMP_2, H_COMP_3, H_COMP_4, H_COMP_5, H_COMP_6, H_COMP_7, H_HSP_RATING, H_QUIET,H_RECMND, H_CLEAN_HSP
-
 * selecting the required measures
 ```{r}
-levels(hcaphs_df$HCAHPS.Measure.ID)
 hcaphs_measures <- c("H_COMP_1_LINEAR_SCORE", "H_COMP_2_LINEAR_SCORE", "H_COMP_3_LINEAR_SCORE", "H_COMP_4_LINEAR_SCORE", "H_COMP_5_LINEAR_SCORE", 
 "H_COMP_6_LINEAR_SCORE", "H_COMP_7_LINEAR_SCORE", "H_HSP_RATING_LINEAR_SCORE", "H_QUIET_LINEAR_SCORE","H_RECMND_LINEAR_SCORE", "H_CLEAN_LINEAR_SCORE")
 
@@ -366,6 +347,7 @@ zdistri_vars <- c("Provider.ID","HCAHPS.Measure.ID","HCAHPS.Linear.Mean.Value","
 
 hcaphs_df_measures_distri <- hcaphs_df_measures[,zdistri_vars] 
 hcaphs_df_measures_distri[is.na(hcaphs_df_measures_distri$HCAHPS.Linear.Mean.Value),] %>% summary()
+
 ```
 
 - which meansures have NA scores?
@@ -384,7 +366,7 @@ patient_exp_group <- hcaphs_df_measures_distri %>% spread(key = HCAHPS.Measure.I
 summary(patient_exp_group)
 ```
 ```{r}
-pairs.panels(patient_exp_group[,-1],cex.labels = 0.6 ,cex.cor = 0.7,main = "Relationship between measures")
+pairs.panels(patient_exp_group[,-1],cex.labels = 0.6 ,cex.cor = 0.7,main = "Patient Experience Relationship between measures")
 ```
 
 - Patient experience measures are uniformly distributed about their mean. Each of the measures have a strong correlation between them.
@@ -413,17 +395,11 @@ head(master_df)
 time_and_eff_care_df <- read.csv(file = "ValidFiles/Timely and Effective Care - Hospital.csv",header = T,check.names = T,stringsAsFactors = T,na.strings = c("Not Available",""))
 str(time_and_eff_care_df)
 ```
-
 # cleaning the demographic variables from the dataset
 
 ```{r}
 zdemogrphic_vars <- which(names(time_and_eff_care_df) %in% zdemographics)
 time_and_eff_care_cleaned <- time_and_eff_care_df[,-zdemogrphic_vars]
-head(time_and_eff_care_cleaned)
-```
-
-```{r}
-summary(time_and_eff_care_cleaned)
 ```
 
 * NA Imputation in the Score Variable
@@ -431,24 +407,19 @@ summary(time_and_eff_care_cleaned)
  + 1. Blank Levels (NA) 2.  "2 - Data submitted were based on a sample of cases/patients."
 
 ```{r}
-time_and_eff_care_cleaned %>% group_by(Footnote) %>% tally()
+time_and_eff_care_cleaned %>% group_by(Footnote) %>% summary(cnt_rows=n())
 ```
 
+- The footnote level "2 - Data submitted were based on a sample of cases/patients." has valid data the and this affects the overall score of the patients
+- So keeping the Footnote level and removing the dataset that have NAs
 
 ```{r}
 time_and_eff_care_cleaned$Score <- as.integer(time_and_eff_care_cleaned$Score)
-time_and_eff_care_cleaned[is.na(time_and_eff_care_cleaned$Footnote),] %>% head()
-
-```
-
-```{r}
-time_and_eff_care_imputed <- time_and_eff_care_cleaned[
-  is.na(time_and_eff_care_cleaned$Footnote) | (time_and_eff_care_cleaned$Footnote %in% c("2 - Data submitted were based on a sample of cases/patients.")),] 
-str(time_and_eff_care_imputed)
+time_and_eff_care_imputed <- time_and_eff_care_cleaned[is.na(time_and_eff_care_cleaned$Footnote) | (time_and_eff_care_cleaned$Footnote %in% c("2 - Data submitted were based on a sample of cases/patients.")),] 
 time_and_eff_care_imputed %>% summary()
 ```
 
-* Subsetting the data by removing the NA from Samples
+* Subsetting the data by removing the NA from Samples 
 
 ```{r}
 time_and_eff_care_imputed <- time_and_eff_care_imputed[!is.na(time_and_eff_care_imputed$Sample),]
@@ -458,16 +429,20 @@ summary(time_and_eff_care_imputed)
 - Performing the validation checks after imputing the NAs in the dataset
 ```{r}
 # Samples Vs Score
-ggplot(time_and_eff_care_imputed, aes(Measure.ID,Score)) + geom_col() + 
+time_and_eff_care_imputed %>% group_by(Measure.ID) %>% summarise(mean_score = round(mean(Score))) %>%
+ggplot(aes(Measure.ID,mean_score)) + geom_col(fill = "steelblue") + 
+  geom_text(aes(label = mean_score),vjust = 0.5,angle = 90,hjust = 1) +
   labs(title = "Measure.ID Vs Scores") +
   theme(axis.text.x = element_text(angle = 60,vjust = 1,hjust = 1),
         plot.title = element_text(hjust = 0.5))
 ```
+AMI_71, AMI7b though have high mean scores, there aren't many providers
 
 ```{r}
-ggplot(time_and_eff_care_imputed, aes(Measure.ID)) + geom_bar() + 
-  labs(title = "Measure.ID Vs Count of Providers") +
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5,hjust = 1),
+ggplot(time_and_eff_care_imputed, aes(Measure.ID)) + geom_bar(fill = "steelblue") + 
+  geom_text(stat = "count",aes(label = ..count..),vjust = 0.5,angle = 90,hjust = 0) +
+  labs(title = "Timeliness and Effectiveness Measure.ID Vs Count of Providers") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),
         plot.title = element_text(hjust = 0.5))
 ```
 
@@ -505,18 +480,13 @@ VTE-6 	Hospital Acquired Potentially-Preventable Venous Thromboembolism
 * Separating the the measure variables needed for analysis
 
 ```{r}
-
 zvar1 <-  which(names(time_and_eff_care_imputed) %in% c("Provider.ID","Measure.ID","Score"))
-
 timeliness_group <- time_and_eff_care_imputed[,zvar1] %>% spread(key = Measure.ID,value = Score)
-
 zvar1 <- which(names(timeliness_group) %in% c("Provider.ID","ED_1b","ED_2b","OP_18b", "OP_3b", "OP_5", "OP_20","OP_21"))
 zvar2 <- which(names(timeliness_group) %in% c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27_FAC_ADHPCT","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1", "STK_4", "STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5", "VTE_6"))
 
 effectiveness_group <- timeliness_group[,zvar2]
 timeliness_group <- timeliness_group[,zvar1]
-
-
 ```
 
 * check the correlation between the measure variables
@@ -537,7 +507,6 @@ names(effectiveness_group)[zvar1] <- "IMM_3_OP_27"
 cor.plot(effectiveness_group[,-1],
         stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,
          xlas = 2,cex.axis = 0.6,main = "Effectiveness group measure correlation")
-
 ```
 - Variables represented by the effectiveness group have small degree of correlation
 
@@ -556,7 +525,6 @@ summary(master_df)
 
 ```{r}
 readm_mort_df <- read.csv(file = "ValidFiles/Readmissions and Deaths - Hospital.csv",check.names = T,header = T,stringsAsFactors = T,na.strings = c("Not Available",""))
-head(readm_mort_df)
 ```
 
 * Purging the demographic variables not needed in the analysis 
@@ -564,14 +532,12 @@ head(readm_mort_df)
 ```{r}
 zdemogrphic_vars <- which(names(readm_mort_df) %in% c(zdemographics,"Measure.Name","Compared.to.National"))
 readm_mort_cleaned <- readm_mort_df[,-zdemogrphic_vars]
-head(readm_mort_cleaned)
 ```
 
 * Analysing the footnote variable
 
 ```{r}
 summary(readm_mort_cleaned)
-
 ```
 ### Imputing the NAs
 
@@ -585,7 +551,7 @@ summary(readm_mort_cleaned)
 
 
 ```{r}
-readm_mort_cleaned[!is.na(readm_mort_cleaned$Footnote),] %>% group_by(Footnote) %>% summarise(cnt_rows = n(),avg_score = mean(Score))
+readm_mort_cleaned[!is.na(readm_mort_cleaned$Footnote),] %>% group_by(Footnote) %>% summarise(cnt_rows = n(),avg_score = mean(Score,na.rm = T))
 ```
 
 * imputing the rows that are as a reslut of stale data from different levels of footnotes
@@ -595,7 +561,8 @@ readm_mort_cleaned <- readm_mort_cleaned[is.na(readm_mort_cleaned$Footnote),]
 
 
 ```{r}
-ggplot(readm_mort_cleaned,aes(Measure.ID,Score)) + geom_col() + 
+readm_mort_cleaned %>% group_by(Measure.ID) %>% summarise(Score = sum(Score)) %>%
+ggplot(aes(Measure.ID,Score)) + geom_col(fill = "steelblue") + geom_text(aes(label = Score),vjust = -0.2,size = 3) +
   labs(title = "Mortality Readmission Rate Score") + ylab(label = "Provider Count") + 
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),
         plot.title = element_text(hjust = 0.5)) 
@@ -604,8 +571,9 @@ ggplot(readm_mort_cleaned,aes(Measure.ID,Score)) + geom_col() +
 * Plotting the Measure variables
 
 ```{r}
-ggplot(readm_mort_cleaned,aes(Measure.ID)) + geom_bar() + labs(title = "Mortality Readmission Rate Count by Providers") + ylab(label = "Provider Count") +
-  theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),
+ggplot(readm_mort_cleaned,aes(Measure.ID)) + geom_bar(fill = "steelblue") + geom_text(stat = "count",aes(label = ..count..),vjust = -.1) +
+  labs(title = "Mortality Readmission Rate Count by Providers") + ylab(label = "Provider Count") +
+  theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),axis.text.y = element_blank(),
         plot.title = element_text(hjust = 0.5)) 
 ```
 
@@ -650,12 +618,11 @@ dim(mortality_grp)
 
 # Checking the correlation between different measures
 ```{r}
-cor.plot(mortality_grp[,-1],cex.axis = 0.6, numbers = TRUE,cex = 0.7,stars = FALSE,show.legend = F,xlas = 2, main = "Mortality Group Correlation Plot")
+pairs.panels(mortality_grp[,-1],scale = TRUE,ellipses = TRUE,pch = 21,bg = rainbow(n = ncol(readmission_grp)),cex.labels = 0.6,cex.cor = 2,main = "Mortality Group Correlation Plot")
 ```
 
 ```{r}
-cor.plot(readmission_grp[,-1],cex.axis = 0.6, numbers = TRUE,cex = 0.7,stars = FALSE,show.legend = F,xlas = 2, main = "Readmission Group Correlation Plot")
-pairs.panels(readmission_grp[,-1],scale = TRUE,ellipses = TRUE,pch = 21,bg = rainbow(n = ncol(readmission_grp)),cex.labels = 0.7)
+pairs.panels(readmission_grp[,-1],scale = TRUE,ellipses = TRUE,pch = 21,bg = rainbow(n = ncol(readmission_grp)),cex.labels = 0.6,cex.cor = 2,main = "Readmission Group Correlation Plot")
 ```
 
 * All varaibles in the dataset are significant and thus are being retained into the final dataframe
@@ -679,10 +646,10 @@ op_imaging_eff_df <- read.csv(file = "ValidFiles/Outpatient Imaging Efficiency -
 head(op_imaging_eff_df)
 ```
 
-# Purging the variables that no useful for analysis
+# Purging the variables that are not useful for analysis
 
 ```{r}
-zdemogrphic_vars <- which(names(op_imaging_eff_df) %in% zdemographics)
+zdemogrphic_vars <- which(names(op_imaging_eff_df) %in% c(zdemographics,"Measure.Start.Date","Measure.End.Date"))
 op_imaging_eff_cleaned <- op_imaging_eff_df[,-zdemogrphic_vars]
 head(op_imaging_eff_cleaned)
 ```
@@ -697,21 +664,27 @@ In order to check the NAs, Footnote is taken as reference to validate the NAs
 
 ```{r}
 op_imaging_eff_cleaned[is.na(op_imaging_eff_cleaned$Footnote),] %>% summary()
-op_imaging_eff_cleaned[!is.na(op_imaging_eff_cleaned$Score),] %>% summary()
 ```
 
-*  From the summary we can infer that most of the NAs in the score are induced by Stale data represented by different classess of Footnotes
+*  From the summary we can infer that most of the NAs in the score are induced by Stale data represented by all classess of Footnotes
+* Imptuting the footnote levels
+
 ```{r}
 op_imaging_eff_cleaned <- op_imaging_eff_cleaned[is.na(op_imaging_eff_cleaned$Footnote),] 
 ```
 # Plotting the trends of Measure Variables acorss the providers
 ```{r}
-ggplot(op_imaging_eff_cleaned,aes(Measure.ID)) + geom_bar() + labs(title = "Count of Providers Vs Imaging Efficiency measures") + 
+ggplot(op_imaging_eff_cleaned,aes(Measure.ID)) + geom_bar(fill = "steelblue") + 
+  geom_text(stat = "count",aes(label = ..count..),vjust = -0.2,angle = 0,hjust = 0.5) +
+  labs(title = "Count of Providers by Imaging Efficiency measures") + 
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ```{r}
-ggplot(op_imaging_eff_cleaned,aes(Measure.ID, mean(Score))) + geom_col() + labs(title = "Count of Providers Vs Imaging Efficiency measures") + 
+op_imaging_eff_cleaned %>% group_by(Measure.ID) %>% summarise(mean_score = mean(Score)) %>%
+ggplot(aes(Measure.ID, mean_score)) + geom_col(fill = "steelblue") + 
+  geom_text(aes(label = round(mean_score,1)),vjust = -0.1,angle = 0,hjust = 0.5) +
+  labs(title = "Count of Providers by Imaging Efficiency measures") + 
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
@@ -735,48 +708,47 @@ head(op_imaging_eff_final)
 ```
 * Checking the variability
 ```{r}
-pairs.panels(op_imaging_eff_final[,-1],scale = T,smooth = T,density = T,ellipses = T,pch = 21,method = 'pearson',cex.labels = 1,cex.cor = 1)
-cor.plot(op_imaging_eff_final[,-1],show.legend = F,xlas = 2,keep.par = T,numbers = T,colors = T)
+pairs.panels(op_imaging_eff_final[,-1],scale = T,smooth = T,density = T,ellipses = T,pch = 21,method = 'pearson',cex.labels = 1,cex.cor = 2,
+             main = "Correlation between Imagining Efficiency Measures ")
 ```
 * Data variablility is uniform acorss the dataset except the Op_10 and OP-11 measure which are closely correlated with skewed distribution
 
 * Merging the imaging the dataframe with Master_dataframe
 
 ```{r}
-master_df <- merge(x = master_df,y = op_imaging_eff_final,by = intersect(x = names(master_df),y = names(op_imaging_eff_final)),all = TRUE) #%>% head()
+master_df_final <- merge(x = master_df,y = op_imaging_eff_final,by = intersect(x = names(master_df),y = names(op_imaging_eff_final)),all = TRUE) 
+summary(master_df_final)
 ```
+
+* removing the provider.id and re arranging the hospital overall rating column
 
 Next steps:
 1. check outliers in the measures
 2. imputing missing values
 
-
-- Replacing NAs in the target variable Hospital.Overall.Rating to "Missing"
-
-```{r}
-ratings <- as.character(master_df$Hospital.overall.rating)
-ratings[which(is.na(ratings))] <- "Missing"
-master_df$Hospital.overall.rating <- factor(ratings)
-```
-
 # which rows have all NAs?
 
 ```{r}
-na_indices <- apply(master_df[,-c(1,2)], MARGIN = 1, function(x) all(is.na(x)))
-sum(na_indices)
-
+na_indices <- apply(master_df_final[,-c(1,2)], MARGIN = 1, function(x) all(is.na(x)))
+sum(na_indices) # there are no columsn with all NAs
 ```
 
+# Replace NA's in the final master_df with Missing
 ```{r}
-paste0(round(prop.table(table(master_df$Hospital.overall.rating))*100,2),"%")
+master_df_final$Hospital.overall.rating[which(is.na(master_df_final$Hospital.overall.rating))] <- "Missing"
+```
+
+
+# Distribution of target variable Hospital Rating
+```{r}
+round(prop.table(table(master_df_final$Hospital.overall.rating)),3)
+paste0(round(prop.table(table(master_df_final$Hospital.overall.rating))*100,2),"%")
 ```
 
 ```{r}
 library(mice)
-master_df_imputed <- mice(data = master_df[,-c(1,2)],seed = 100,maxit = 5,m = 5)
-
-master_df_imputed_final <-  complete(data = master_df_imputed,action = 5)
-head(master_df_imputed_final)
+master_df_imputed <- mice(data = master_df_final[,-c(1,2)],seed = 100,maxit = 5,m = 5)
+master_df_imputed_final <-  mice::complete(data = master_df_imputed,action = 5)
 ```
 
 # Spliting the dataset into training and testing 
@@ -784,8 +756,29 @@ head(master_df_imputed_final)
 ```{r}
 set.seed(100)
 
+master_df_final <- data.frame(Hospital.overall.rating = master_df$Hospital.overall.rating,master_df_imputed_final)
+str(master_df_final)
+# Sampling
+indices <- sample(1:nrow(master_df_final),0.7 * nrow(master_df_final))
+
+# training dataset
+train_df <- master_df_final[indices,]
+# test dataset
+test_df <- master_df_final[-indices,]
+```
+
+
+```{r}
+set.seed(100)
+
 master_df_final <- cbind(master_df[,c(1,2)],master_df_imputed_final)
 
+zz <- as.character(master_df_final$Hospital.overall.rating)
+
+master_df_final[master_df_final$Hospital.overall.rating != "Missing",]
+
+
+master_df_final <- master_df_no_na_final
 #master_df_final <- master_df
 # Sampling
 indices <- sample(1:nrow(master_df_final),0.7 * nrow(master_df_final))
@@ -797,8 +790,6 @@ test_df <- master_df_final[-indices,]
 ```
 
 # Model building
-
-
 ### using RandomForest Algorithm
 
 ```{r}
@@ -825,6 +816,7 @@ model_rf <- randomForest(Hospital.overall.rating ~.,
                          tuneGrid = tuning_grid_rf,
                          metric = "auc",
                          na.action = na.roughfix,
+                         scale = TRUE,
                          seed = 100)
 model_rf
 ```
