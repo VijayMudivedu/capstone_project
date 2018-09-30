@@ -15,7 +15,7 @@ library(knitr)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r echo=FALSE}
 library(tidyverse)
 #setwd("~/Google Drive/_OneDrive_Atimi_Software/Upgrad/_Upgrad/Capstone_project/")
 ```
@@ -30,15 +30,7 @@ str(general_info)
 ```
 
 
-<!-- * This analysis is being run for Acute Care Hospitals.  -->
-<!-- * But the dataset contains the Acute care, Childrens, and Critical Access Hosptials.  -->
-<!-- * Hence filtering out all the acute care hosptials from the General Information dataset -->
-
-
-<!-- ```{r} -->
-<!-- unique(general_info$Hospital.Type) -->
-<!-- ``` -->
-#### filtering the acute care hospitals, removing the columns not needed for analysis
+## Filtering the demographic variables not needed for analysis
 
 ```{r}
 zdemographics <- c("Hospital.Name","Address","City","State","County.Name","Phone.Number","ZIP.Code")
@@ -50,11 +42,12 @@ zvar2 <- which(names(general_info) %in% zvar1)
 general_info_cleaned <- general_info[,-c(zdemogrphic_vars,zvar2)]
 general_info_cleaned$Hospital.overall.rating <- as.factor(general_info_cleaned$Hospital.overall.rating)
 ```
-# Check if the NAs in the Ratings are missing at Random in the Footnote
+
+## Check if the NAs in the Ratings are missing at Random in the Footnote
 
 * footnote with levels are inducing the NAs in the dataset: 
-+ "Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs" is inducing the NAs across the dataset, 
-+ "Data suppressed by CMS for one or more quarters"
+    + "Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs" is inducing the NAs across the dataset
+    + "Data suppressed by CMS for one or more quarters"
 
 * This enables us to conclude that the provider ids related this level can be purged from the dataset
 
