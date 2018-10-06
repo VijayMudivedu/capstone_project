@@ -720,7 +720,7 @@ pairs.panels(op_imaging_eff_final[,-1],scale = T,smooth = T,density = T,ellipses
 
 ```{r}
 master_df_final <- merge(x = master_df,y = op_imaging_eff_final,by = intersect(x = names(master_df),y = names(op_imaging_eff_final)),all = TRUE) 
-summary(master_df_final)
+head(master_df_final)
 ```
 
 * removing the provider.id and re arranging the hospital overall rating column
@@ -742,77 +742,6 @@ master_df_final$Hospital.overall.rating[which(is.na(master_df_final$Hospital.ove
 ```
 
 
-# Distribution of target variable Hospital Rating
-```{r}
-round(prop.table(table(master_df_final$Hospital.overall.rating)),3)
-paste0(round(prop.table(table(master_df_final$Hospital.overall.rating))*100,2),"%")
-```
-
-```{r}
-
-zz <- data.frame(master_df[which(master_df$Hospital.overall.rating %in% "Missing"),-c(1,2)] %>% apply(MARGIN = 2,FUN = function(x) sum(is.na(x)))) 
-names(zz)[1] <- "count"
-zz$measure_id <- row.names(zz)
-ggplot(zz,aes(reorder(measure_id,-count),count)) + geom_col(fill = "steelblue") + labs(title = "NAs induced in the Measure.ID's due to missing ratings") +
-  theme(axis.text.x = element_text(angle = 90,hjust = 1),axis.title.x = element_blank(), plot.title = element_text(hjust = 0.5,face = "bold"))
-
-```
-
-
-Which Hospitals have more Not Available Scores across different measures?
-- Most of the NAs in the measures is due the Missing rating in the Hosptial Rating.
-
-```{r}
-zz_master_df <- master_df_final
-zz_master_df$na_sums <- rowSums(is.na(master_df_final[,-c(1,2)]))
-zz_master_df$Provider.ID[which(zz_master_df$na_sums == 63)]
-```
-
-Different groups identified so far are:
-1. Mortality group
-2. Saftey of Care
-3. Readmission
-4. Patient Experience
-5. Effectiveness of Care
-6. Timeliness of care
-7. Efficient Use of Imaging
-
-
-## Safety of Care Group
-## Latent variable model
-```{r}
-names(master_df_final)
-# safety of care
-zvar2 <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
-zvar1 <- which(names(master_df_final) %in% zvar2)
-safety_of_care_group <- master_df_final[,zvar1]
-head(safety_of_care_group)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ```{r}
 library(mice)
 master_df_imputed <- mice(data = master_df_final[,-c(1,2)],seed = 100,maxit = 5,m = 5)
@@ -820,138 +749,116 @@ master_df_imputed_final <-  mice::complete(data = master_df_imputed,action = 5)
 ```
 
 
-# Spliting the dataset into training and testing 
+Groups identified so far are:
+1. Mortality group - -
+2. Saftey of Care +
+3. Readmission  -
+4. Patient Experience  +
+5. Effectiveness of Care +
+6. Timeliness of care - 
+7. Efficient Use of Imaging +
 
+
+## 1 Safety of Care Group
+## Latent variable model
 ```{r}
-set.seed(100)
-
-master_df_model <- data.frame(Hospital.overall.rating = master_df_final$Hospital.overall.rating,master_df_imputed_final)
-
-# Sampling
-indices <- sample(1:nrow(master_df_model),0.7 * nrow(master_df_model))
-
-# training dataset
-train_df <- master_df_model[indices,]
-# test dataset
-test_df <- master_df_model[-indices,]
+# safety of care
+zvar2 <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+safety_of_care_group <- master_df_imputed_final[,zvar1]
+head(safety_of_care_group)
 ```
 
-# Model building
-### using RandomForest Algorithm
-
+## 2 patient_experience Group
+## Latent Variable model
 ```{r}
-set.seed(100)
-library(randomForest)
-library(caret)
-library(doParallel)
-doParallel::registerDoParallel(cl = 4,cores = 4)
-
-train_control_rf <- trainControl(method = "repeatedcv",
-                                  repeats = 5,
-                                  number = 5,
-                                  search = "grid",
-                                  sampling = "smote",
-                                 allowParallel = TRUE)
-
-# Tuning grid parameters of Random Forest
-tuning_grid_rf <- expand.grid(.mtry = round(sqrt(ncol(train_df[,-1]))),ntree = seq(100,1000,100)) 
-
-# training the random forest with training dataset
-model_rf <- randomForest(Hospital.overall.rating ~.,
-                         data = train_df,
-                         trControl = train_control_rf,
-                         tuneGrid = tuning_grid_rf,
-                         metric = "auc",
-                         na.action = na.roughfix,
-                         scale = TRUE,
-                         seed = 100)
-model_rf
+# safety of care
+zvar2 <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+patient_experience_group <- master_df_imputed_final[,zvar1]
+head(patient_experience_group)
 ```
 
-### Predicting the Hospital Ratings
-
+## 3 Effectiveness Group
+## Latent Variable model
 ```{r}
-vars_predict <- setdiff(x = names(train_df[,-1]),y = "Hospital.overall.rating")
-predict_rf <- stats::predict(object = model_rf,test_df[vars_predict])
-# Confusion Matrix
-confusionMatrix(predict_rf,test_df$Hospital.overall.rating)
+# safety of care
+zvar2 <- c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1","STK_4","STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5","VTE_6")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+effectiveness_group <- master_df_imputed_final[,zvar1]
+head(effectiveness_group)
 ```
 
-### Variables of importance identifeid by the RandomForest
-
+## 4 timeliness of care Group
+## Latent Variable model
 ```{r}
-varImp(model_rf)
+# safety of care
+zvar2 <- c("Provider.ID","ED_1b","ED_2b","OP_18b","OP_20","OP_21","OP_3b","OP_5")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+timeliness_of_care_group <- master_df_imputed_final[,zvar1]
+head(timeliness_of_care_group)
+```
+
+## 5 medical imagine efficiency group
+## Latent Variable model
+```{r}
+names(master_df_imputed_final)
+# safety of care
+zvar2 <- c("Provider.ID","OP_10","OP_11","OP_13","OP_14","OP_8")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+medical_imaging_efficiency_group <- master_df_imputed_final[,zvar1]
+head(medical_imaging_efficiency_group)
+```
+
+## 6 readmission group
+## Latent Variable model
+```{r}
+# safety of care
+zvar2 <- c("Provider.ID","READM_30_AMI","READM_30_CABG","READM_30_COPD","READM_30_HF","READM_30_HIP_KNEE","READM_30_HOSP_WIDE","READM_30_PN","READM_30_STK")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+readmission_group <- master_df_imputed_final[,zvar1]
+head(readmission_group)
+
+```
+
+
+## 7 mortality group
+## Latent Variable model
+```{r}
+# safety of care
+zvar2 <- c("Provider.ID","MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK","PSI_4_SURG_COMP")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+mortality_group <- master_df_imputed_final[,zvar1]
+head(mortality_group)
+```
+
+# Step 1: Standarizing the variable each of the groups
+
+# Standardizing the measure
+```{r}
+standardization <- function(x) (x-mean(x))/sd(x)
+```
+
+Standardizing the 
+```{r}
+safety_of_care_group_std <- apply(safety_of_care_group[,-1],MARGIN = 2,FUN = function(x) round(standardization(x),4))
+factanal(safety_of_care_group_std,factors = 3)
+
+apply(safety_of_care_group[,-1],MARGIN = 2,pnorm)
+
 ```
 
 
 
-## Ignoring the Hospitals with missing Hospital Ratings and buding a random Forest model for the remaining dataset
 
-```{r}
-set.seed(100)
 
-master_df_model <- data.frame(Hospital.overall.rating = master_df_final$Hospital.overall.rating,master_df_imputed_final)
 
-# Removing the Hospital with Hospital Rating as "Missing"
-ratings <- master_df_model$Hospital.overall.rating
-ratings[ratings %in% "Missing"] <- NA
-ratings <- as.integer(ratings)
-master_df_model_no_Missing <- data.frame(Hospital.overall.rating = ratings,master_df_model[,-1])
 
-master_df_model_no_Missing <- master_df_model_no_Missing[!is.na(master_df_model_no_Missing$Hospital.overall.rating),]
-master_df_model_no_Missing$Hospital.overall.rating <- as.factor(master_df_model_no_Missing$Hospital.overall.rating)
 
-# Sampling
-indices_no_missing <- sample(1:nrow(master_df_model_no_Missing),0.7 * nrow(master_df_model_no_Missing))
 
-# training dataset
-train_df <- master_df_model_no_Missing[indices_no_missing,]
-# test dataset
-test_df <- master_df_model_no_Missing[-indices_no_missing,]
-```
 
-### using RandomForest Algorithm for Hospitals ignoring the  Missing Rating
 
-```{r}
-set.seed(100)
-library(randomForest)
-library(caret)
-library(doParallel)
-doParallel::registerDoParallel(cl = 4,cores = 4)
 
-train_control_rf <- trainControl(method = "repeatedcv",
-                                  repeats = 5,
-                                  number = 5,
-                                  search = "grid",
-                                  sampling = "smote",
-                                 allowParallel = TRUE)
 
-# Tuning grid parameters of Random Forest
-tuning_grid_rf <- expand.grid(.mtry = round(sqrt(ncol(train_df[,-1]))),ntree = seq(100,1000,100)) 
 
-# training the random forest with training dataset
-model_rf_no_na <- randomForest(Hospital.overall.rating ~.,
-                         data = train_df,
-                         trControl = train_control_rf,
-                         tuneGrid = tuning_grid_rf,
-                         metric = "auc",
-                         na.action = na.roughfix,
-                         scale = TRUE,
-                         seed = 100)
-model_rf_no_na
-```
 
-* Prediction using the Random Forest
-
-```{r}
-
-vars_predict <- setdiff(x = names(train_df[,-1]),y = "Hospital.overall.rating")
-predict_rf_no_na <- stats::predict(object = model_rf_no_na,test_df[vars_predict])
-# Confusion Matrix
-confusionMatrix(predict_rf_no_na,test_df$Hospital.overall.rating)
-```
-
-### model parameters of importance are
-```{r}
-model_rf_no_na$importance
-```

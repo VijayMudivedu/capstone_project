@@ -525,6 +525,7 @@ summary(master_df)
 
 ```{r}
 readm_mort_df <- read.csv(file = "ValidFiles/Readmissions and Deaths - Hospital.csv",check.names = T,header = T,stringsAsFactors = T,na.strings = c("Not Available",""))
+head(readm_mort_df)
 ```
 
 * Purging the demographic variables not needed in the analysis 
