@@ -294,6 +294,7 @@ zvar1 <- c( "Provider.ID", "Measure.ID", "Score")
 zvar2 <- which(names(hai_df_cleaned) %in% zvar1)
 
 hai_df_final <- hai_df_cleaned[,zvar2] %>% spread(key = "Measure.ID",value = "Score")
+#hai_df_final$COMP_HIP_KNEE <- complications_df_final$COMP_HIP_KNEE - these items cannot be combined they have differing levels of records
 summary(hai_df_final)
 ```
 
@@ -310,6 +311,7 @@ pairs.panels(x = hai_df_final[,-1],cex.cor = 0.5,cex.labels = 0.9,ellipses = TRU
 gen_inf_compli_df <- merge(x = general_info_final,y = complications_df_final,all = TRUE, by = intersect(x = names(general_info_final),y = names(complications_df_final)))
 
 safety_of_care_group <- merge(x = gen_inf_compli_df,y = hai_df_final,all = TRUE,by = intersect(x = names(gen_inf_compli_df),y = names(hai_df_final)))
+head(safety_of_care_group)
 ```
 
 # Analysis of HCAPHS dataset
@@ -607,6 +609,7 @@ readm_mort_final <- readm_mort_cleaned[,zvar1] %>% spread(key = Measure.ID,value
 ```{r}
 zvar1 <- which(names(readm_mort_final) %in% c("Provider.ID","MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK"))
 mortality_grp <- readm_mort_final[,zvar1]
+#mortality_grp$PSI_4_SURG_COMP <- safety_of_care_group$PSI_4_SURG_COMP #These groups cannot be combined as they has different records
 zvar1 <- which(names(readm_mort_final) %in% c("MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK"))
 readmission_grp <- readm_mort_final[,-zvar1]
 ```
@@ -747,7 +750,7 @@ paste0(round(prop.table(table(master_df_final$Hospital.overall.rating))*100,2),"
 
 ```{r}
 
-zz <- data.frame(zz_master_df[which(zz_master_df$Hospital.overall.rating %in% "Missing"),-c(1,2)] %>% apply(MARGIN = 2,FUN = function(x) sum(is.na(x)))) 
+zz <- data.frame(master_df[which(master_df$Hospital.overall.rating %in% "Missing"),-c(1,2)] %>% apply(MARGIN = 2,FUN = function(x) sum(is.na(x)))) 
 names(zz)[1] <- "count"
 zz$measure_id <- row.names(zz)
 ggplot(zz,aes(reorder(measure_id,-count),count)) + geom_col(fill = "steelblue") + labs(title = "NAs induced in the Measure.ID's due to missing ratings") +
@@ -764,6 +767,51 @@ zz_master_df <- master_df_final
 zz_master_df$na_sums <- rowSums(is.na(master_df_final[,-c(1,2)]))
 zz_master_df$Provider.ID[which(zz_master_df$na_sums == 63)]
 ```
+
+Different groups identified so far are:
+1. Mortality group
+2. Saftey of Care
+3. Readmission
+4. Patient Experience
+5. Effectiveness of Care
+6. Timeliness of care
+7. Efficient Use of Imaging
+
+
+## Safety of Care Group
+## Latent variable model
+```{r}
+names(master_df_final)
+# safety of care
+zvar2 <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
+zvar1 <- which(names(master_df_final) %in% zvar2)
+safety_of_care_group <- master_df_final[,zvar1]
+head(safety_of_care_group)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```{r}
 library(mice)
