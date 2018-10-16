@@ -4,7 +4,9 @@ author: "Vijay Mudivedu"
 date: '2018-09-02'
 output:
   html_document:
-    df_print: paged
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 10
     toc: yes
   word_document:
     toc: yes
@@ -77,6 +79,8 @@ general_info_cleaned <- general_info_cleaned %>%
   filter(!general_info_cleaned$Hospital.overall.rating.footnote %in% 
            c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
              "Data suppressed by CMS for one or more quarters","Results are not available for this reporting period"))
+
+
 ```
 
 * Barplot of the ratings show that the Hospital rating has a gaussian distribution
@@ -746,14 +750,17 @@ master_df_final$Hospital.overall.rating[which(is.na(master_df_final$Hospital.ove
 library(mice)
 master_df_imputed <- mice(data = master_df_final[,-c(1,2)],seed = 100,maxit = 5,m = 5)
 master_df_imputed_final <-  mice::complete(data = master_df_imputed,action = 5)
+master_df_imputed_final <- cbind(Provider.ID = master_df_final$Provider.ID,master_df_imputed_final)
 ```
 
 
 Groups identified so far are:
-1. Mortality group - -
+Outcome Groups:
+1. Mortality group  -
 2. Saftey of Care +
 3. Readmission  -
 4. Patient Experience  +
+Process Groups:
 5. Effectiveness of Care +
 6. Timeliness of care - 
 7. Efficient Use of Imaging +
@@ -765,9 +772,44 @@ Groups identified so far are:
 # safety of care
 zvar2 <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-safety_of_care_group <- master_df_imputed_final[,zvar1]
-head(safety_of_care_group)
+
+# scaled # winsorized 
+safety_of_care_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
+
+plot(density(safety_of_care_group))
 ```
+
+
+# Latent Variable Model - Factor Analysis technique to identify the underlying factors in the continuous variable
+
+Latent Variable model is used to summarize the information. For the Star Rating LVM assumes that each measure reflects information about the underlying unobserved dimension of quality. 
+
+LVM is constructed for each group independently.
+
+- Different approaches to factor analysis to identify the factors
+- Using the psych library functions to:
+  - 1. identify a the factors
+  - 2. compute the factors
+
+```{r}
+
+nfactors(x=safety_of_care_group,n=20,
+         rotate="varimax",diagonal=FALSE,
+         fm="ml",title="Number of Factors",pch=16,use="complete")
+fa.parallel(x = safety_of_care_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,use = "complete")
+
+# factoring method, fm = "pa" pa- principal axis, rotate = with max variance, minres - min resume
+
+fm = "ml" # maximum likelihood
+rotate = "varimax" # varimax rotation to obtain maximum variance between the measons
+
+safety_care_fact_anal <- fa(r = safety_of_care_group,nfactors = 5,rotate = rotate,fm = fm)
+safety_care_fact_anal
+# Computing the average rowmeans of all factors scores
+safety_of_care_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID ,
+                                          safe_of_care = rowMeans(as.data.frame(safety_care_fact_anal$scores)))
+```
+
 
 ## 2 patient_experience Group
 ## Latent Variable model
@@ -775,8 +817,28 @@ head(safety_of_care_group)
 # safety of care
 zvar2 <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-patient_experience_group <- master_df_imputed_final[,zvar1]
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+patient_experience_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
 head(patient_experience_group)
+plot(density(patient_experience_group))
+```
+
+
+## Patient experience latent model
+
+```{r}
+# Applying the latent view factor analysis
+nfactors(patient_experience_group,rotate = "varimax",fm = "ml",pch = 16,use = "complete") 
+fa.parallel(x = patient_experience_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1)
+
+# there are five factors that explain the variance between the groups
+
+patient_exp_factor_anal <- fa(patient_experience_group,nfactors = 5,rotate = "varimax",scores = "regression",fm = "ml")
+patient_exp_factor_anal
+patient_experience_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              patient_exp = rowMeans(as.data.frame(patient_exp_factor_anal$scores)))
+
 ```
 
 ## 3 Effectiveness Group
@@ -785,30 +847,88 @@ head(patient_experience_group)
 # safety of care
 zvar2 <- c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1","STK_4","STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5","VTE_6")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-effectiveness_group <- master_df_imputed_final[,zvar1]
-head(effectiveness_group)
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+effectiveness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
+plot(density(effectiveness_group))
+
 ```
 
-## 4 timeliness of care Group
+
+### LVM - effectiveness group
+
+```{r}
+# Applying the latent view factor analysis
+nfactors(effectiveness_group) 
+fa.parallel(x = effectiveness_group,fm = "minres",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+
+```
+
+```{r}
+# parallel factor analysis, eight factors that explain the maximum variance between the groups
+
+effectiveness_group_factor_anal <- fa(effectiveness_group,nfactors = 8,rotate = "varimax",scores = "regression",fm = "ml")
+effectiveness_group_factor_anal
+effectiveness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              effectiveness = rowMeans(as.data.frame(effectiveness_group_factor_anal$scores)))
+```
+
+
+## 4 timeliness Group
 ## Latent Variable model
 ```{r}
 # safety of care
 zvar2 <- c("Provider.ID","ED_1b","ED_2b","OP_18b","OP_20","OP_21","OP_3b","OP_5")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-timeliness_of_care_group <- master_df_imputed_final[,zvar1]
-head(timeliness_of_care_group)
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+timeliness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
+plot(density(timeliness_group))
+```
+
+### LVM - timelines group
+
+```{r}
+# Applying the latent view factor analysis
+nfactors(timeliness_group) 
+fa.parallel(x = timeliness_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+
+# First five factors that explain the maximum variance between the groups
+
+timeliness_group_factor_anal <- fa(timeliness_group,nfactors = 5,rotate = "varimax",scores = "regression",fm = "ml")
+timeliness_group_factor_anal
+
+timeliness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              effectiveness = rowMeans(as.data.frame(timeliness_group_factor_anal$scores)))
 ```
 
 ## 5 medical imagine efficiency group
 ## Latent Variable model
 ```{r}
-names(master_df_imputed_final)
 # safety of care
 zvar2 <- c("Provider.ID","OP_10","OP_11","OP_13","OP_14","OP_8")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-medical_imaging_efficiency_group <- master_df_imputed_final[,zvar1]
-head(medical_imaging_efficiency_group)
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+medical_imaging_efficiency_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
+plot(density(medical_imaging_efficiency_group))
 ```
+
+
+```{r}
+# Applying the latent view factor analysis
+nfactors(medical_imaging_efficiency_group) 
+fa.parallel(x = medical_imaging_efficiency_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+
+# First five factors that explain the maximum variance between the groups
+imaging_eff_group_factor_anal <- fa(medical_imaging_efficiency_group[,-1],nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+imaging_eff_group_factor_anal
+
+medical_imaging_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              effectiveness = rowMeans(as.data.frame(imaging_eff_group_factor_anal$scores)))
+
+```
+
 
 ## 6 readmission group
 ## Latent Variable model
@@ -816,39 +936,63 @@ head(medical_imaging_efficiency_group)
 # safety of care
 zvar2 <- c("Provider.ID","READM_30_AMI","READM_30_CABG","READM_30_COPD","READM_30_HF","READM_30_HIP_KNEE","READM_30_HOSP_WIDE","READM_30_PN","READM_30_STK")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-readmission_group <- master_df_imputed_final[,zvar1]
-head(readmission_group)
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+readmission_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) *direction
+plot(density(readmission_group))
+```
+
+```{r}
+# Applying the latent view factor analysis
+nfactors(readmission_group) 
+fa.parallel(x = readmission_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+
+# First five factors that explain the maximum variance between the groups
+readmission_group_factor_anal <- fa(readmission_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+readmission_group_factor_anal
+
+readmission_group_score <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              readmission_score = rowMeans(as.data.frame(readmission_group_factor_anal$scores)))
 
 ```
 
-
 ## 7 mortality group
 ## Latent Variable model
+
 ```{r}
 # safety of care
 zvar2 <- c("Provider.ID","MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK","PSI_4_SURG_COMP")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
-mortality_group <- master_df_imputed_final[,zvar1]
-head(mortality_group)
+
+# scaling the patient experience group and winsoring between +/- 3Sigma
+mortality_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
+plot(density(mortality_group))
 ```
 
-# Step 1: Standarizing the variable each of the groups
 
-# Standardizing the measure
 ```{r}
-standardization <- function(x) (x-mean(x))/sd(x)
+# Applying the latent view factor analysis
+nfactors(mortality_group) 
+fa.parallel(x = mortality_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+
+# First three factors that explain the maximum variance between the groups
+# Parllel analysis suggest = 3 factors that explains the common variance
+mortality_group_factor_anal <- fa(mortality_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+mortality_group_factor_anal
+
+medical_imaging_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
+                                              effectiveness = rowMeans(as.data.frame(imaging_eff_group_factor_anal$scores)))
+
 ```
 
-Standardizing the 
-```{r}
-safety_of_care_group_std <- apply(safety_of_care_group[,-1],MARGIN = 2,FUN = function(x) round(standardization(x),4))
-factanal(safety_of_care_group_std,factors = 3)
-
-apply(safety_of_care_group[,-1],MARGIN = 2,pnorm)
-
-```
-
-
+Groups identified so far are:
+1. Mortality group  -
+2. Saftey of Care +
+3. Readmission  -
+4. Patient Experience  +
+5. Effectiveness of Care +
+6. Timeliness of care - 
+7. Efficient Use of Imaging +
 
 
 
