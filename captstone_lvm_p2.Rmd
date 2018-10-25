@@ -890,7 +890,6 @@ master_df_model_Missing$Hospital.overall.rating <- predicted_rating_missing_Valu
 
 # combining the missing and no missing rows
 predict_master_df <- rbind(master_df_model_no_Missing,master_df_model_Missing) 
-
 ```
 
 
@@ -898,15 +897,6 @@ predict_master_df <- rbind(master_df_model_no_Missing,master_df_model_Missing)
 str(master_df_model)
 str(final_scores)
 ```
-
-## predicting the missing using the random forest model
-
-```{r}
-
-```
-
-
-
 
 Groups identified so far are:
 Outcome Groups:
@@ -924,8 +914,8 @@ Process Groups:
 ## Latent variable model
 ```{r}
 # safety of care
-zvar2 <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+zvar_saftey <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_saftey)
 
 # scaled # winsorized 
 safety_of_care_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
@@ -960,20 +950,18 @@ fa.parallel(x = safety_of_care_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 
 fm = "ml" # maximum likelihood
 rotate = "varimax" # varimax rotation to obtain maximum variance between the measons
 
-safety_care_fact_anal <- fa(r = safety_of_care_group,nfactors = 5,rotate = rotate,fm = fm)
+safety_care_fact_anal <- fa(r = safety_of_care_group,nfactors = 4,rotate = rotate,fm = fm)
 safety_care_fact_anal
 # Computing the average rowmeans of all factors scores
 safety_of_care_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID ,
                                           safe_of_care_score = rowMeans(as.data.frame(safety_care_fact_anal$scores)))
 ```
-
-
 ## 2 patient_experience Group
 ## Latent Variable model
 ```{r}
 # safety of care
-zvar2 <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+zvar_patient_exp <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_patient_exp)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 patient_experience_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
@@ -988,15 +976,17 @@ plot(density(patient_experience_group))
 # Applying the latent view factor analysis
 nfactors(patient_experience_group,rotate = "varimax",fm = "ml",pch = 16,use = "complete") 
 fa.parallel(x = patient_experience_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1)
-
 ```
 
 ```{r}
 
 # there are five factors that explain the variance between the groups
 
-patient_exp_factor_anal <- fa(patient_experience_group,nfactors = 4,rotate = "varimax",scores = "regression",fm = "ml")
-patient_exp_factor_anal
+patient_exp_factor_anal <- fa(patient_experience_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml",n.iter = 5)
+patient_exp_factor_anal$loadings
+patient_exp_factor_anal$score.cor
+rowMeans(as.data.frame(patient_exp_factor_anal$scores))*rescale(patient_experience_group)
+rowMeans(patient_exp_factor_anal$loadings)
 patient_experience_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
                                               patient_exp = rowMeans(as.data.frame(patient_exp_factor_anal$scores)))
 ```
@@ -1005,9 +995,9 @@ patient_experience_group_scores <- data.frame(Provider.ID = master_df_imputed_fi
 ## 3 readmission group
 ## Latent Variable model
 ```{r}
-# safety of care
-zvar2 <- c("Provider.ID","READM_30_AMI","READM_30_CABG","READM_30_COPD","READM_30_HF","READM_30_HIP_KNEE","READM_30_HOSP_WIDE","READM_30_PN","READM_30_STK")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+# readmission
+zvar_readm <- c("Provider.ID","READM_30_AMI","READM_30_CABG","READM_30_COPD","READM_30_HF","READM_30_HIP_KNEE","READM_30_HOSP_WIDE","READM_30_PN","READM_30_STK")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_readm)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 readmission_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) *direction
@@ -1018,13 +1008,11 @@ plot(density(readmission_group))
 # Applying the latent view factor analysis to identify the factors in the readmission group
 nfactors(readmission_group) 
 fa.parallel(x = readmission_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
-
-
 ```
 
 ```{r}
 # First five factors that explain the maximum variance between the groups
-readmission_group_factor_anal <- fa(readmission_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+readmission_group_factor_anal <- fa(readmission_group,nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
 readmission_group_factor_anal
 
 readmission_group_score <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
@@ -1034,9 +1022,9 @@ readmission_group_score <- data.frame(Provider.ID = master_df_imputed_final$Prov
 ## 4 mortality group
 
 ```{r}
-# safety of care
-zvar2 <- c("Provider.ID","MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK","PSI_4_SURG_COMP")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+# mortality group
+zvar_mort <- c("Provider.ID","MORT_30_AMI","MORT_30_CABG","MORT_30_COPD","MORT_30_HF","MORT_30_PN","MORT_30_STK","PSI_4_SURG_COMP")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_mort)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 mortality_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
@@ -1055,7 +1043,7 @@ fa.parallel(x = mortality_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim
 ```{r}
 # First three factors that explain the maximum variance between the groups
 # Parllel analysis suggest = 3 factors that explains the common variance
-mortality_group_factor_anal <- fa(mortality_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+mortality_group_factor_anal <- fa(mortality_group,nfactors = 1,rotate = "varimax",scores = "regression",fm = "ml")
 mortality_group_factor_anal
 
 mortality_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
@@ -1066,9 +1054,9 @@ mortality_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provi
 ## 5. Process Group 4% - Effectiveness Group
 
 ```{r}
-# safety of care
-zvar2 <- c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1","STK_4","STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5","VTE_6")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+# Effectiveness of Care
+zvar_eff <- c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1","STK_4","STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5","VTE_6")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_eff)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 effectiveness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
@@ -1090,7 +1078,7 @@ fa.parallel(x = effectiveness_group,fm = "minres",fa = "both",plot = TRUE,n.iter
 -- applying the factor analysis
 
 ```{r}
-effectiveness_group_factor_anal <- fa(effectiveness_group,nfactors = 8,rotate = "varimax",scores = "regression",fm = "ml")
+effectiveness_group_factor_anal <- fa(effectiveness_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
 effectiveness_group_factor_anal
 effectiveness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
                                               effectiveness_score = rowMeans(as.data.frame(effectiveness_group_factor_anal$scores)))
@@ -1098,8 +1086,8 @@ effectiveness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$P
 
 ## 6 timeliness Group
 ```{r}
-zvar2 <- c("Provider.ID","ED_1b","ED_2b","OP_18b","OP_20","OP_21","OP_3b","OP_5")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+zvar_tim <- c("Provider.ID","ED_1b","ED_2b","OP_18b","OP_20","OP_21","OP_3b","OP_5")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_tim)
 
 # scaling the timeliness between +/1 3Sigma and winsorizing the scores
 timeliness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
@@ -1117,7 +1105,7 @@ fa.parallel(x = timeliness_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,si
 
 ```{r}
 
-timeliness_group_factor_anal <- fa(timeliness_group,nfactors = 5,rotate = "varimax",scores = "regression",fm = "ml")
+timeliness_group_factor_anal <- fa(timeliness_group,nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
 timeliness_group_factor_anal
 
 timeliness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
@@ -1128,8 +1116,8 @@ timeliness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Prov
 
 ```{r}
 # safety of care
-zvar2 <- c("Provider.ID","OP_10","OP_11","OP_13","OP_14","OP_8")
-zvar1 <- which(names(master_df_imputed_final) %in% zvar2)
+zvar_imag <- c("Provider.ID","OP_10","OP_11","OP_13","OP_14","OP_8")
+zvar1 <- which(names(master_df_imputed_final) %in% zvar_imag)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 medical_imaging_efficiency_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
@@ -1141,9 +1129,11 @@ plot(density(medical_imaging_efficiency_group))
 # Applying the latent view factor analysis
 nfactors(medical_imaging_efficiency_group) 
 fa.parallel(x = medical_imaging_efficiency_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+```
 
+```{r}
 # First five factors that explain the maximum variance between the groups
-imaging_eff_group_factor_anal <- fa(medical_imaging_efficiency_group[,-1],nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
+imaging_eff_group_factor_anal <- fa(medical_imaging_efficiency_group[,-1],nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
 imaging_eff_group_factor_anal
 
 medical_imaging_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
@@ -1168,56 +1158,105 @@ final_scores <- cbind(Provider.ID=patient_experience_group_scores[,1],
                       timeliness = timeliness_group_scores[,-1]*process_group_weight,
                       effectiveness_score = effectiveness_group_scores[,-1]*process_group_weight,
                       imaging_eff = medical_imaging_group_scores[,-1]*process_group_weight)
+
+pairs.panels(final_scores[,-c(1,9)])
+# doesn't indicate strong correlation between the groups.
+
 ```
 
 
 ```{r}
-
-
 # K-means clustering algorithm to the dataset
 # applying the Clustering Algorithm
-
 
 # logic to identify the knee
 n_clusters <- 50
 
+# initializing the r_squared vector
 r_squared <- rnorm(n_clusters)
 
+# clearing the garbage collector
 gc()
+
 for(i in 1:n_clusters) {
-  
+  # clustering the final scores nstart = 50 , iter.max = 50
   kmeans_clustering <- kmeans(x = final_scores[,-1],centers = i,nstart = 50,iter.max = 50,algorithm="Hartigan-Wong")
+  
+  # r_squared is the ratio of betweenss/totalss
   r_squared[i] <- (kmeans_clustering$betweenss)/(kmeans_clustering$totss)
   }
 
 plot(r_squared)
 
-
-# with 5 clustering
+# with 5 clusters
 kmeans_clustering <- kmeans(x = final_scores[,-1],centers = 5,iter.max = 50L,nstart = 50)
 
 # Assigning clusters to the final_scores
 final_scores <- as.data.frame(final_scores)
 final_scores$rating_clster <- as.factor(kmeans_clustering$cluster)
 
-table(final_scores$rating_clster)
+final_scores %>% group_by(rating_clster) %>% summarise(count_rws = n()) %>% mutate(total_rows = sum(count_rws),count_rws*100/total_rows)
+
 ```
 
 
+ 
 ```{r}
 
 library(caret)
 str(final_scores)
 str(master_df_final$Hospital.overall.rating)
-confusionMatrix(factor(predict_rf),reference = factor(final_scores$rating_clster))
+
+# comparing the hospial ratings of random forest and clustering  
+confusionMatrix(data = factor(predict_master_df$Hospital.overall.rating),reference = factor(final_scores$rating_clster))
 
 table(predict_rf,final_scores$rating_clster)
 length(factor(predict_rf))
+```
+
+```{r}
+model_rf$importance
+```
+
+# COnfirmatory Factor analysis Using Lavaan
+
+```{r}
+# library(lavaan)
+# 
+# cms.rating.model <- ' zsafe =~ COMP_HIP_KNEE + PSI_90_SAFETY + HAI_1_SIR + HAI_2_SIR + HAI_3_SIR + HAI_4_SIR + HAI_5_SIR + HAI_6_SIR
+# zpatient =~ H_CLEAN + H_COMP_1 + H_COMP_2 + H_COMP_3 + H_COMP_4 + H_COMP_5 + H_COMP_6 + H_COMP_7 + H_HSP_RATING + H_QUIET + H_RECMND
+# zread =~ READM_30_AMI + READM_30_CABG + READM_30_COPD + READM_30_HF + READM_30_HIP_KNEE + READM_30_HOSP_WIDE + READM_30_PN + READM_30_STK
+# zmort =~ MORT_30_AMI + MORT_30_CABG + MORT_30_COPD + MORT_30_HF + MORT_30_PN + MORT_30_STK + PSI_4_SURG_COMP
+# zimag =~ OP_10 + OP_11 + OP_13 + OP_14 + OP_8
+# ztim =~ ED_1b + ED_2b + OP_18b + OP_20 + OP_21 + OP_3b + OP_5
+# zeff =~ CAC_3 + IMM_2 + IMM_3_OP_27 + OP_22 + OP_23 + OP_29 + OP_30 + OP_4 + PC_01 + STK_1 + STK_4 + STK_6 + STK_8 + VTE_1 + VTE_2 + VTE_3 + VTE_5 + VTE_6 '
+# 
+# 
+# # model fit
+# cms_fit <- lavaan::cfa(model = cms.rating.model, data = master_df_imputed_final[,-1])
+# cms_fit <- lavaan::sem(model = cms.rating.model, data = master_df_imputed_final[,-1])
+# summary(cms_fit)
+# lavInspect(cms_fit,"optim.gradient")
+# paste(zvar_mort[-1],collapse = " + ")
+# 
 
 ```
 
+Part 3 - Recommendations for Hospitals
+
+Suppose you work for a healthcare consulting company. The hospital with Provider ID = 140010 (EVANSTON HOSPITAL) is your client. 
+
+The hospital’s current star rating is 3 and it wants to improve it to at least 4 next year. The data required for this analysis is already available to you. 
+
+Using your understanding of the star rating system, recommend ways to improve the rating. The structure you follow for this part is up to you. 
 
 
+```{r}
 
+master_df_final[which(master_df$Provider.ID %in% "140010"),]
+
+final_scores[which(final_scores$rating_clster %in% "4"),]
+
+```
 
 
