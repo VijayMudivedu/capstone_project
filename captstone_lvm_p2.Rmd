@@ -16,6 +16,8 @@ output:
 #install.packages("mice")
 #install.packages("psych")
 #install.packages("doParallel")
+#install.packages("cowplot")
+#install.packages("tidyverse")
 ```
 
 
@@ -35,12 +37,10 @@ library(tidyverse)
 ```{r capstone}
 general_info <- read.csv(file = "ValidFiles/Hospital General Information.csv",header = T,check.names = T,na.strings = c("Not Available",""),
                          stringsAsFactors = T)
-str(general_info) 
 ```
 
-
-## Filtering the demographic variables not needed for analysis
-
+- Filtering the demographic variables, "Hospital.Name","Address","City","State","County.Name","Phone.Number","ZIP.Code" not needed for analysis
+- FIltertime the redundant variables that do not contribute for analysis
 ```{r}
 zdemographics <- c("Hospital.Name","Address","City","State","County.Name","Phone.Number","ZIP.Code")
 zdemogrphic_vars <- which(names(general_info) %in% zdemographics)
@@ -50,9 +50,10 @@ zvar2 <- which(names(general_info) %in% zvar1)
 general_info_cleaned <- general_info[,-c(zdemogrphic_vars,zvar2)]
 ```
 
-# Replacing the empty values in the target variable as "Missing"
+# There are missing ratings in the target variable "Hospital.Overall.Rating". Replacing the empty values in the target variable as "Missing"
 ```{r}
 general_info_cleaned$Hospital.overall.rating[which(is.na(general_info_cleaned$Hospital.overall.rating))] <- "Missing"
+# Coverting the targe variable to factor
 general_info_cleaned$Hospital.overall.rating <- as.factor(general_info_cleaned$Hospital.overall.rating)
 ```
 
@@ -79,11 +80,9 @@ general_info_cleaned <- general_info_cleaned %>%
   filter(!general_info_cleaned$Hospital.overall.rating.footnote %in% 
            c("Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs",
              "Data suppressed by CMS for one or more quarters","Results are not available for this reporting period"))
-
-
 ```
 
-* Barplot of the ratings show that the Hospital rating has a gaussian distribution
+* Barplot of the ratings show that the Hospital rating has a Gaussian distribution
 ```{r}
 ggplot(data = general_info_cleaned,aes(x = Hospital.overall.rating)) + 
   geom_bar(na.rm = T, fill = "steelblue") + geom_text(stat = "count", aes(label = paste0(round(..count../sum(..count..),3)*100)),hjust = 0) + 
@@ -92,7 +91,7 @@ ggplot(data = general_info_cleaned,aes(x = Hospital.overall.rating)) +
         panel.background = element_blank(),axis.text.y = element_text(hjust = 1)) + coord_flip()
 ```
 
-* checking the level footnote level of Hospital Rating 
+* checking the level footnote level of Hospital Rating once again.
   - "There are too few measures or measure groups reported to calculate a star rating or measure group score"
   - "Results are not available for this reporting period"
 
@@ -114,6 +113,7 @@ summary(general_info_cleaned)
 
 ```
 
+### General Info csv file conclusions
 1. We thus have conclusively arrived at the "general_info_final" dataset with 1-5 hospital ratings imputing the NAs
 2. Picking the hospital Rating from the general info cleaned dataset 
 
@@ -123,7 +123,7 @@ general_info_final <- general_info_cleaned[is.na(general_info_cleaned$Hospital.o
 summary(general_info_final)
 dim(general_info_final)
 ```
-# Analysing the Complications dataset
+# Analysing the Complications 
 
 ```{r}
 complications_df <- read.csv(file = "ValidFiles//Complications - Hospital.csv",
@@ -183,12 +183,11 @@ complications_df_cleaned_footnote_nas %>% group_by(Measure.ID) %>%
 ```
 
 - Significant Measures from this dataset measures are "PSI_90_SAFETY","PSI_4_SURG_COMP" "COMP_HIP_KNEE"
-
-- rejecting the Denominoator, Lower Estimate, Higher Estimate, Compared.to.National variables
+- rejecting the Denominator, Lower Estimate, Higher Estimate, Compared.to.National variables
 - Important measures are 
 
 ```{r}
-zvar1 <- c( "Provider.ID", "Measure.ID", "Score")
+zvar1 <- c("Provider.ID", "Measure.ID", "Score")
 zvar2 <- which(names(complications_df_cleaned_footnote_nas) %in% zvar1)
 
 complications_df_final <-  complications_df_cleaned_footnote_nas[,zvar2] %>%  spread(key = Measure.ID,value = Score)
@@ -206,16 +205,11 @@ complications_df_final <- complications_df_final[,zvar1]
 library(psych)
 pairs.panels(x = complications_df_final[2:ncol(complications_df_final)], main = "Complications dataset correlation ",
              bg = rainbow(n = 12),smooth = TRUE, ellipses = TRUE,pch = 21,cex.cor = 0.85,cex.labels = 0.6)
-
 ```
 
-# Analysis for Healthcare Associated Infections - For Hosptial
-
+## Analysis for Healthcare Associated Infections - For Hosptial
 ```{r}
 hai_df <- read.csv(file = "~/Google Drive/_OneDrive_Atimi_Software/Upgrad/_Upgrad/Capstone_project/capstone_project/ValidFiles/Healthcare Associated Infections - Hospital.csv",na.strings = c("Not Available",""))
-```
-
-```{r}
 summary(hai_df)
 ```
 
@@ -273,44 +267,41 @@ HAI-4 Surgical Site Infection from abdominal hysterectomy (SSI: Hysterectomy)
 HAI-5 Methicillin-resistant Staphylococcus Aureus (MRSA) Blood Laboratory-identified Events (Bloodstream infections)
 HAI-6 Clostridium difficile (C.diff.) Laboratory-identified Events (Intestinal infections)
 
-
 ```{r}
 hai_measures <- c("HAI_1_SIR", "HAI_2_SIR", "HAI_3_SIR", "HAI_4_SIR", "HAI_5_SIR", "HAI_6_SIR")
-
-# Filterig the measure.ids useful for analysis
+# Filtering the measure.ids useful for analysis
 hai_df_cleaned <- hai_df_cleaned[which(hai_df_cleaned$Measure.ID %in% hai_measures),]
-
 ```
-
+# Plotting the measures required for the analysis
 ```{r}
 ggplot(data = hai_df_cleaned,aes(x = Measure.ID)) + 
-  geom_bar(fill = "steelblue",na.rm = TRUE) + xlab("Measure.ID") + geom_text(stat = "count",aes(label = ..count..),vjust = -.1) +
+  geom_bar(fill = "steelblue",na.rm = TRUE) + xlab("Measure.ID") + 
+  geom_text(stat = "count",aes(label = ..count..),vjust = -.1) +
   labs(title = "Hospital Associated Infections by Measure by Hospital Count") +
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1))
-
 ```
 
-
-- selecting the required measures for analysis
-
 ```{r}
+# Selecting the required variables for analysis
 zvar1 <- c( "Provider.ID", "Measure.ID", "Score")
 zvar2 <- which(names(hai_df_cleaned) %in% zvar1)
 
+# converting the measure variables from long format to wide format
 hai_df_final <- hai_df_cleaned[,zvar2] %>% spread(key = "Measure.ID",value = "Score")
-#hai_df_final$COMP_HIP_KNEE <- complications_df_final$COMP_HIP_KNEE - these items cannot be combined they have differing levels of records
 summary(hai_df_final)
 ```
 
+# Checking the correlation between the variables. 
 ```{r}
 pairs.panels(x = hai_df_final[,-1],cex.cor = 0.5,cex.labels = 0.9,ellipses = TRUE,pch = 21,bg = rainbow(length(zvar1)), 
              main = "Hospital Patient Safety Group variable correlation" )
 
 ```
 
-- The hospital associated infections group groups variable sare
+- From the correlation plot HAI_1, HAI_2, HAI_3, HAI_4, HAI_5 measures have some degree of correlation between them
 
-- merging the data complications final with general information dataset 
+# merging the complications_df final with general information final together w.r.t to the "Provider.ID" gives rise to "Saftey of Care Group"
+
 ```{r}
 gen_inf_compli_df <- merge(x = general_info_final,y = complications_df_final,all = TRUE, by = intersect(x = names(general_info_final),y = names(complications_df_final)))
 
@@ -322,20 +313,21 @@ head(safety_of_care_group)
 
 ```{r}
 hcaphs_df <- read.csv(file = "ValidFiles/HCAHPS - Hospital.csv",header = TRUE,check.names = TRUE,na.strings = c("Not Available","Not Applicable",""))
+head(hcaphs_df)
 ```
 
-# removing the demographic columns, Mesaure Start Date and measure end data columns
+# Removing the demographic columns, Mesaure Start Date and measure end data columns
 
 ```{r}
-zdemographics
 hcaphs_df_cleaned <- hcaphs_df[,-which(names(hcaphs_df) %in% zdemographics)]
+head(hcaphs_df_cleaned)
 ```
 
 - Extracting the Measure IDs that are of importance from:
 H_COMP_1_LINEAR_SCORE, H_COMP_2_LINEAR_SCORE, H_COMP_3_LINEAR_SCORE, H_COMP_4_LINEAR_SCORE, H_COMP_5_LINEAR_SCORE, 
 H_COMP_6_LINEAR_SCORE, H_COMP_7_LINEAR_SCORE, H_HSP_RATING_LINEAR_SCORE, H_QUIET_LINEAR_SCORE,H_RECMND_LINEAR_SCORE, H_CLEAN_LINEAR_SCORE, 
 
-* selecting the required measures
+- Selecting the required measures
 ```{r}
 hcaphs_measures <- c("H_COMP_1_LINEAR_SCORE", "H_COMP_2_LINEAR_SCORE", "H_COMP_3_LINEAR_SCORE", "H_COMP_4_LINEAR_SCORE", "H_COMP_5_LINEAR_SCORE", 
 "H_COMP_6_LINEAR_SCORE", "H_COMP_7_LINEAR_SCORE", "H_HSP_RATING_LINEAR_SCORE", "H_QUIET_LINEAR_SCORE","H_RECMND_LINEAR_SCORE", "H_CLEAN_LINEAR_SCORE")
@@ -344,19 +336,17 @@ hcaphs_df_measures <- hcaphs_df_cleaned %>% filter(hcaphs_df_cleaned$HCAHPS.Meas
 hcaphs_df_measures$HCAHPS.Measure.ID <- as.character(hcaphs_df_measures$HCAHPS.Measure.ID)
 hcaphs_df_measures$HCAHPS.Measure.ID <- str_replace(string = hcaphs_df_measures$HCAHPS.Measure.ID,pattern = "_LINEAR_SCORE",replacement = "")
 hcaphs_df_measures$HCAHPS.Measure.ID <- as.factor(hcaphs_df_measures$HCAHPS.Measure.ID)
+
+head(hcaphs_df_measures)
 ```
 
-
+- Selecting only the important Variables 
 ```{r}
 zdistri_vars <- c("Provider.ID","HCAHPS.Measure.ID","HCAHPS.Linear.Mean.Value","Number.of.Completed.Surveys",
                   "Survey.Response.Rate.Percent.Footnote","Number.of.Completed.Surveys.Footnote")
 
 hcaphs_df_measures_distri <- hcaphs_df_measures[,zdistri_vars] 
-hcaphs_df_measures_distri[is.na(hcaphs_df_measures_distri$HCAHPS.Linear.Mean.Value),] %>% summary()
-
 ```
-
-- which meansures have NA scores?
 
 - Eliminating the rows that have NA scores  1. too few cases to report, 2. Results are unavailable for the current reporting period 3. Data Specific to IQR and OQR
 
@@ -365,12 +355,14 @@ hcaphs_df_measures_distri[is.na(hcaphs_df_measures_distri$Survey.Response.Rate.P
 hcaphs_df_measures_distri <- hcaphs_df_measures_distri[is.na(hcaphs_df_measures_distri$Survey.Response.Rate.Percent.Footnote),c(1,2,3)]
 ```
 
-* creating the patient experience group spreading the measure ids
+* creating the patient experience group and spreading the measure ids
 
 ```{r}
 patient_exp_group <- hcaphs_df_measures_distri %>% spread(key = HCAHPS.Measure.ID, value = HCAHPS.Linear.Mean.Value)
-summary(patient_exp_group)
+head(patient_exp_group)
 ```
+- Checking the correlation between the Patient Experience Measure Variables for each hosptial
+
 ```{r}
 pairs.panels(patient_exp_group[,-1],cex.labels = 0.6 ,cex.cor = 0.7,main = "Patient Experience Relationship between measures")
 ```
@@ -399,17 +391,18 @@ head(master_df)
 
 ```{r}
 time_and_eff_care_df <- read.csv(file = "ValidFiles/Timely and Effective Care - Hospital.csv",header = T,check.names = T,stringsAsFactors = T,na.strings = c("Not Available",""))
-str(time_and_eff_care_df)
+head(time_and_eff_care_df)
 ```
 # cleaning the demographic variables from the dataset
 
 ```{r}
 zdemogrphic_vars <- which(names(time_and_eff_care_df) %in% zdemographics)
 time_and_eff_care_cleaned <- time_and_eff_care_df[,-zdemogrphic_vars]
+head(time_and_eff_care_cleaned)
 ```
 
 * NA Imputation in the Score Variable
-* considering the Footnote levels as a reference to impute the NAs, the levels below satisfy the non-stale data category.
+* Considering the Footnote levels as a reference to impute the NAs, the levels below satisfy the non-stale data category.
  + 1. Blank Levels (NA) 2.  "2 - Data submitted were based on a sample of cases/patients."
 
 ```{r}
@@ -421,31 +414,31 @@ time_and_eff_care_cleaned %>% group_by(Footnote) %>% summary(cnt_rows=n())
 
 ```{r}
 time_and_eff_care_cleaned$Score <- as.integer(time_and_eff_care_cleaned$Score)
-time_and_eff_care_imputed <- time_and_eff_care_cleaned[is.na(time_and_eff_care_cleaned$Footnote) | (time_and_eff_care_cleaned$Footnote %in% c("2 - Data submitted were based on a sample of cases/patients.")),] 
-time_and_eff_care_imputed %>% summary()
+time_and_eff_care_cleaned <- time_and_eff_care_cleaned[is.na(time_and_eff_care_cleaned$Footnote) | (time_and_eff_care_cleaned$Footnote %in% c("2 - Data submitted were based on a sample of cases/patients.")),] 
+time_and_eff_care_cleaned %>% summary()
 ```
 
-* Subsetting the data by removing the NA from Samples 
+* Subsetting the data by removing the NA from "Samples" variable
 
 ```{r}
-time_and_eff_care_imputed <- time_and_eff_care_imputed[!is.na(time_and_eff_care_imputed$Sample),]
-summary(time_and_eff_care_imputed)
+time_and_eff_care_cleaned <- time_and_eff_care_cleaned[!is.na(time_and_eff_care_cleaned$Sample),]
 ```
 
 - Performing the validation checks after imputing the NAs in the dataset
 ```{r}
 # Samples Vs Score
-time_and_eff_care_imputed %>% group_by(Measure.ID) %>% summarise(mean_score = round(mean(Score))) %>%
+time_and_eff_care_cleaned %>% group_by(Measure.ID) %>% summarise(mean_score = round(mean(Score))) %>%
 ggplot(aes(Measure.ID,mean_score)) + geom_col(fill = "steelblue") + 
   geom_text(aes(label = mean_score),vjust = 0.5,angle = 90,hjust = 1) +
   labs(title = "Measure.ID Vs Scores") +
   theme(axis.text.x = element_text(angle = 60,vjust = 1,hjust = 1),
         plot.title = element_text(hjust = 0.5))
 ```
-AMI_71, AMI7b though have high mean scores, there aren't many providers
+
+- AMI_71, AMI7b though have high mean scores, there aren't many providers
 
 ```{r}
-ggplot(time_and_eff_care_imputed, aes(Measure.ID)) + geom_bar(fill = "steelblue") + 
+ggplot(time_and_eff_care_cleaned, aes(Measure.ID)) + geom_bar(fill = "steelblue") + 
   geom_text(stat = "count",aes(label = ..count..),vjust = 0.5,angle = 90,hjust = 0) +
   labs(title = "Timeliness and Effectiveness Measure.ID Vs Count of Providers") +
   theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),
@@ -486,8 +479,8 @@ VTE-6 	Hospital Acquired Potentially-Preventable Venous Thromboembolism
 * Separating the the measure variables needed for analysis
 
 ```{r}
-zvar1 <-  which(names(time_and_eff_care_imputed) %in% c("Provider.ID","Measure.ID","Score"))
-timeliness_group <- time_and_eff_care_imputed[,zvar1] %>% spread(key = Measure.ID,value = Score)
+zvar1 <-  which(names(time_and_eff_care_cleaned) %in% c("Provider.ID","Measure.ID","Score"))
+timeliness_group <- time_and_eff_care_cleaned[,zvar1] %>% spread(key = Measure.ID,value = Score)
 zvar1 <- which(names(timeliness_group) %in% c("Provider.ID","ED_1b","ED_2b","OP_18b", "OP_3b", "OP_5", "OP_20","OP_21"))
 zvar2 <- which(names(timeliness_group) %in% c("Provider.ID","CAC_3","IMM_2","IMM_3_OP_27_FAC_ADHPCT","OP_22","OP_23","OP_29","OP_30","OP_4","PC_01","STK_1", "STK_4", "STK_6","STK_8","VTE_1","VTE_2","VTE_3","VTE_5", "VTE_6"))
 
@@ -504,18 +497,18 @@ pairs.panels(x = timeliness_group[2:length(zvar1)],cex.cor = 0.5,cex.labels = 0.
 - ED_1B and ED_2B are the inversely correlated to some extent as the timespent in the emergency room is the common between them. They are inversely correlated as the doctors visit reduces the time spend by the patient before moving to ED to inpatient room is reduced.
 
 ```{r}
+# renmaing the measures "IMM_3_OP_27"
 zvar1 <- which(names(effectiveness_group) %in% "IMM_3_OP_27_FAC_ADHPCT")
-names(effectiveness_group)[zvar1] <- "IMM_3_OP_27"
-
+names(effectiveness_group)[zvar1] <- "IMM_3_OP_27" 
 ```
 
+- Plotting the Correlation between the effectiveness group measures
 ```{r}
 cor.plot(effectiveness_group[,-1],
         stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,
          xlas = 2,cex.axis = 0.6,main = "Effectiveness group measure correlation")
 ```
 - Variables represented by the effectiveness group have small degree of correlation
-
 - Merging the timliness group and effectiveness group with master dataframe
 
 ```{r}
@@ -538,20 +531,21 @@ readm_mort_df <- read.csv(file = "ValidFiles/Readmissions and Deaths - Hospital.
 ```{r}
 zdemogrphic_vars <- which(names(readm_mort_df) %in% c(zdemographics,"Measure.Name","Compared.to.National"))
 readm_mort_cleaned <- readm_mort_df[,-zdemogrphic_vars]
+head(readm_mort_cleaned)
 ```
 
-* Analysing the footnote variable
+- Analysing the footnote variable
 
 ```{r}
 summary(readm_mort_cleaned)
 ```
-### Imputing the NAs
+### removing the records filled defective foot notes.
 
 * Considering the Footnote variable as the reference variable. Assuming that the levels specified below encapsulate the NAs in the dataset. A summary rollover on the dataset breifs the situation that below levels holds NAs
 
  1 - The number of cases/patients is too few to report.
 19 - Data are shown only for hospitals that participate in the Inpatient Quality Reporting (IQR) and Outpatient Quality Reporting (OQR) programs.
- 4 - Data suppressed by CMS for one or more quarters.  
+ 4 - Data suppressed by CMS for one or more quarters.
  5 - Results are not available for this reporting period.
  7 - No cases met the criteria for this measure.
 
@@ -560,11 +554,13 @@ summary(readm_mort_cleaned)
 readm_mort_cleaned[!is.na(readm_mort_cleaned$Footnote),] %>% group_by(Footnote) %>% summarise(cnt_rows = n(),avg_score = mean(Score,na.rm = T))
 ```
 
-* imputing the rows that are as a reslut of stale data from different levels of footnotes
+* Footnotes that are stale do not have any scores.
+* Removing the rows that are as a reslut of stale data from different levels of footnotes
 ```{r}
 readm_mort_cleaned <- readm_mort_cleaned[is.na(readm_mort_cleaned$Footnote),]
 ```
 
+- Plotting the Mortality Mean scores values
 
 ```{r}
 readm_mort_cleaned %>% group_by(Measure.ID) %>% summarise(Score = sum(Score)) %>%
@@ -574,7 +570,7 @@ ggplot(aes(Measure.ID,Score)) + geom_col(fill = "steelblue") + geom_text(aes(lab
         plot.title = element_text(hjust = 0.5)) 
 ```
 
-* Plotting the Measure variables
+* Plotting the Mortality Measure variables by Count
 
 ```{r}
 ggplot(readm_mort_cleaned,aes(Measure.ID)) + geom_bar(fill = "steelblue") + geom_text(stat = "count",aes(label = ..count..),vjust = -.1) +
@@ -628,6 +624,9 @@ dim(mortality_grp)
 pairs.panels(mortality_grp[,-1],scale = TRUE,ellipses = TRUE,pch = 21,bg = rainbow(n = ncol(readmission_grp)),cex.labels = 0.6,cex.cor = 2,main = "Mortality Group Correlation Plot")
 ```
 
+- Mortality measures have gaussian distribution
+- Mortality measure have positive correlation between themselves
+
 ```{r}
 pairs.panels(readmission_grp[,-1],scale = TRUE,ellipses = TRUE,pch = 21,bg = rainbow(n = ncol(readmission_grp)),cex.labels = 0.6,cex.cor = 2,main = "Readmission Group Correlation Plot")
 ```
@@ -644,6 +643,7 @@ Ailments are significantly correlated.
 
 ```{r}
 master_df <- merge(x = master_df,y = readm_mort_final,by = intersect(x = names(master_df),y = names(readm_mort_final)),all = TRUE)
+head(master_df)
 ```
 
 # Analysis of Imaging dataset
@@ -660,21 +660,20 @@ zdemogrphic_vars <- which(names(op_imaging_eff_df) %in% c(zdemographics,"Measure
 op_imaging_eff_cleaned <- op_imaging_eff_df[,-zdemogrphic_vars]
 head(op_imaging_eff_cleaned)
 ```
-
+- Verifying the distribution of different measures
 ```{r}
 summary(op_imaging_eff_cleaned)
 ```
 
-* NA imputation in the Score variables
-* which measures Scores have NAs? 
-In order to check the NAs, Footnote is taken as reference to validate the NAs
+- In order to check the distribution of NAs in Score variable, Footnote is taken as reference to validate the NAs
 
 ```{r}
-op_imaging_eff_cleaned[is.na(op_imaging_eff_cleaned$Footnote),] %>% summary()
+#op_imaging_eff_cleaned[is.na(op_imaging_eff_cleaned$Footnote),] %>% summary()
+op_imaging_eff_cleaned %>% group_by(Footnote) %>% summarise(count_score = sum(Score,na.rm = T))
 ```
 
-*  From the summary we can infer that most of the NAs in the score are induced by Stale data represented by all classess of Footnotes
-* Imptuting the footnote levels
+* From the summary we can infer that most of the NAs in the score are induced by Stale data represented by all classess of Footnotes except NA/Missing
+* Purging the footnote levels that do not contribute 
 
 ```{r}
 op_imaging_eff_cleaned <- op_imaging_eff_cleaned[is.na(op_imaging_eff_cleaned$Footnote),] 
@@ -686,6 +685,7 @@ ggplot(op_imaging_eff_cleaned,aes(Measure.ID)) + geom_bar(fill = "steelblue") +
   labs(title = "Count of Providers by Imaging Efficiency measures") + 
   theme(plot.title = element_text(hjust = 0.5))
 ```
+- The plots suggests that all measures of Imaging efficiency are significant.
 
 ```{r}
 op_imaging_eff_cleaned %>% group_by(Measure.ID) %>% summarise(mean_score = mean(Score)) %>%
@@ -713,7 +713,9 @@ op_imaging_eff_final <- op_imaging_eff_cleaned[,zvar2] %>% spread(key = Measure.
 op_imaging_eff_final <- op_imaging_eff_final[,-ncol(op_imaging_eff_final)]
 head(op_imaging_eff_final)
 ```
-* Checking the variability
+
+* Checking the variability correlation that exist between the imaging measures
+
 ```{r}
 pairs.panels(op_imaging_eff_final[,-1],scale = T,smooth = T,density = T,ellipses = T,pch = 21,method = 'pearson',cex.labels = 1,cex.cor = 2,
              main = "Correlation between Imagining Efficiency Measures ")
@@ -745,7 +747,7 @@ sum(na_indices) # there are no columsn with all NAs
 master_df_final$Hospital.overall.rating[which(is.na(master_df_final$Hospital.overall.rating))] <- "Missing"
 ```
 
-
+# imputing the missing values using the mice library
 ```{r}
 library(mice)
 master_df_imputed <- mice(data = master_df_final[,-c(1,2)],seed = 100,maxit = 5,m = 5)
@@ -893,14 +895,9 @@ predict_master_df <- rbind(master_df_model_no_Missing,master_df_model_Missing)
 ```
 
 
-```{r}
-str(master_df_model)
-str(final_scores)
-```
-
 Groups identified so far are:
 Outcome Groups:
-1. Mortality group  -
+1. Mortality group:  - This is a negative group
 2. Saftey of Care +
 3. Readmission  -
 4. Patient Experience  +
@@ -911,20 +908,20 @@ Process Groups:
 
 
 ## 1 Safety of Care Group
-## Latent variable model
 ```{r}
-# safety of care
+# safety of care has a positive impact on the overall rating
 zvar_saftey <- c("Provider.ID","COMP_HIP_KNEE","PSI_90_SAFETY","HAI_1_SIR","HAI_2_SIR","HAI_3_SIR","HAI_4_SIR","HAI_5_SIR","HAI_6_SIR")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar_saftey)
 
 # scaled # winsorized 
 safety_of_care_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
 
-plot(density(safety_of_care_group))
 ```
 
 
-# Latent Variable Model - Factor Analysis technique to identify the underlying factors in the continuous variable
+## Applying Latent Variable Model 
+
+- Factor Analysis technique to identify the underlying factors in the continuous variable
 
 Latent Variable model is used to summarize the information. For the Star Rating LVM assumes that each measure reflects information about the underlying unobserved dimension of quality. 
 
@@ -932,32 +929,173 @@ LVM is constructed for each group independently.
 
 - Different approaches to factor analysis to identify the factors
 - Using the psych library functions to:
-  - 1. identify a the factors
+  - 1. identify the factors
   - 2. compute the factors
 
 ```{r}
 
-nfactors(x=safety_of_care_group,n=20,
+zxz <- nfactors(x=safety_of_care_group,n=20,
          rotate="varimax",diagonal=FALSE,
          fm="ml",title="Number of Factors",pch=16,use="complete")
-fa.parallel(x = safety_of_care_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,use = "complete")
 
-```
+# Extracting the number of factors
+n_factors = sum(!is.na(zxz$vss.stats[,"prob"]))
 
-```{r}
-
+# From the nfactors, it is clear that the saftey_care variable is to be factored into 4 factors.
 # factoring method, fm = "pa" pa- principal axis, rotate = with max variance, minres - min resume
 fm = "ml" # maximum likelihood
 rotate = "varimax" # varimax rotation to obtain maximum variance between the measons
+nfactors = n_factors
+scores = "regression"
+safety_care_fact_anal <- fa(r = safety_of_care_group,rotate = rotate,fm = fm,scores = scores,nfactors = nfactors)
 
-safety_care_fact_anal <- fa(r = safety_of_care_group,nfactors = 4,rotate = rotate,fm = fm)
-safety_care_fact_anal
-# Computing the average rowmeans of all factors scores
-safety_of_care_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID ,
-                                          safe_of_care_score = rowMeans(as.data.frame(safety_care_fact_anal$scores)))
+# using the loadings
+safety_loadings <- safety_care_fact_anal$loadings
+cor.plot(safety_of_care_group,stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,upper = F,
+         xlas = 2,cex.axis = 0.6,main = "Patient Safety group measure correlation")
+
+# computing the mean loading
+patient_safety_loading <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
+
+# comparing with correlations
+cor_matrix <- data.frame(cor(safety_of_care_group))
+cor_matrix <- data.frame(sapply(cor_matrix, function(x) round(mean(x), 2)))
+cor_matrix <- cbind(cor_matrix, round(patient_safety_loading, 2))
+colnames(cor_matrix) <- c("avg_correlation", "mean_factor_loading")
+cor_matrix
+
+# comparing the relation between the avg correlation, mean factor loadings, mean weights
+mean_weights = round(apply(safety_care_fact_anal$weights,1,mean),3)
+cbind(cor_matrix,mean_wghts = mean_weights)
+
+# It is clear that factor loadings are proportional to mean_weights.
+
+# Num of Hospitals with greater than 3 measures having NAs in master_df_final is to be eliminated as per CMS
+master_df_final_safety_care_measures <- cbind(master_df_final$Provider.ID,master_df_final[,which(colnames(master_df_final) %in% colnames(safety_of_care_group))])
+
+# filtering the indices with containing NA score measures <= 3 
+valid_indices <- apply(master_df_final_safety_care_measures[,-1],1,function(x) sum(is.na(x))) < 3
+master_df_final_safety_care_measures <- master_df_final_safety_care_measures[valid_indices==TRUE,] 
+
+# Num of Providers with less than 3 measures having NAs in the master_df_final
+table(valid_indices)
+
+# In order to calculate scores,imputing the missing values in the scores variable
+impute_na <- function(measure){
+  measure[which(is.na(measure))] <- median(measure, na.rm=T)
+  return(measure)
+}
+
+master_df_final_safety_care_measures <- data.frame(sapply(master_df_final_safety_care_measures, impute_na))
+
+# calculating group score of Patient Experience and Saftety of Care
+mean_weights
+master_df_final_safety_care_measures$score <- 0
+
+# using sweep function to multiply mean_weights with each hospital group measure to evaluate to the total group score from all the measures.
+master_df_final_safety_care_measures$score <- apply(sweep(master_df_final_safety_care_measures[,-1],MARGIN = 2, mean_weights/length(mean_weights),'*'),1,sum) %>% round(digits = 3)
+
+# selecting the score measures
+saftey_group_score <- master_df_final_safety_care_measures[, c("master_df_final.Provider.ID", "score")]
+colnames(saftey_group_score) <- c("Provider.ID", "saftey_score")
+head(saftey_group_score)
+plot(density(saftey_group_score$saftey_score))
+```
+
+### Generic function that would convert the remaining groups to group scores
+
+
+- we need to do this for 6 other groups, so
+- let's put this entire code in a function
+- it takes in the main group measures and the measure correlation as input
+- and returns the group scores for each hospital
+
+
+```{r}
+
+# Initialize the function
+f_group_scores <- function(group_measure) {
+  
+zxz <- nfactors(x=group_measure,n=20,
+         rotate="varimax",diagonal=FALSE,
+         fm="ml",title="Number of Factors",pch=16,use="complete")
+
+# Extracting the number of factors
+n_factors = sum(!is.na(zxz$vss.stats[,"prob"]))
+
+# From the nfactors, it is clear that the saftey_care variable is to be factored into 4 factors.
+# factoring method, fm = "pa" pa- principal axis, rotate = with max variance, minres - min resume
+fm = "ml" # maximum likelihood
+rotate = "varimax" # varimax rotation to obtain maximum variance between the measons
+nfactors = n_factors
+scores = "regression"
+safety_care_fact_anal <- fa(r = group_measure,rotate = rotate,fm = fm,scores = scores,nfactors = nfactors)
+
+# using the loadings
+safety_loadings <- safety_care_fact_anal$loadings
+cor.plot(group_measure,stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,upper = F,
+         xlas = 2,cex.axis = 0.6,main = "Patient Safety group measure correlation")
+
+# computing the mean loading
+patient_safety_loading <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
+
+# comparing with correlations
+cor_matrix <- data.frame(cor(group_measure))
+cor_matrix <- data.frame(sapply(cor_matrix, function(x) round(mean(x), 2)))
+cor_matrix <- cbind(cor_matrix, round(patient_safety_loading, 2))
+colnames(cor_matrix) <- c("avg_correlation", "mean_factor_loading")
+cor_matrix
+
+# comparing the relation between the avg correlation, mean factor loadings, mean weights
+mean_weights = round(apply(safety_care_fact_anal$weights,1,mean),3)
+cbind(cor_matrix,mean_wghts = mean_weights)
+
+# It is clear that factor loadings are proportional to mean_weights.
+
+# Num of Hospitals with greater than 3 measures having NAs in master_df_final is to be eliminated as per CMS
+master_df_final_group_measure <- cbind(master_df_final$Provider.ID,master_df_final[,which(colnames(master_df_final) %in% colnames(group_measure))])
+
+# filtering the indices with containing NA score measures <= 3 
+valid_indices <- apply(master_df_final_group_measure[,-1],1,function(x) sum(is.na(x))) < 3
+master_df_final_group_measure <- master_df_final_group_measure[valid_indices==TRUE,] 
+
+# Num of Providers with less than 3 measures having NAs in the master_df_final
+table(valid_indices)
+
+# In order to calculate scores,imputing the missing values in the scores variable
+impute_na <- function(measure){
+  measure[which(is.na(measure))] <- median(measure, na.rm=T)
+  return(measure)
+}
+
+master_df_final_group_measure <- data.frame(sapply(master_df_final_group_measure, impute_na))
+
+# calculating group score of Patient Experience and Saftety of Care
+
+# # using sweep function to multiply mean_weights with each hospital group measure to evaluate to the total group score from all the measures.
+# master_df_final_group_measure$score <- apply(sweep(master_df_final_group_measure[,-1],
+#                                                    MARGIN = 2, mean_weights/length(mean_weights),'*'),1,sum) %>% round(digits = 3)
+# 
+
+  
+  n <- ncol(master_df_final_group_measure) 
+  master_df_final_group_measure$score <- 0
+  
+  for (row in 1:nrow(master_df_final_group_measure)){
+    master_df_final_group_measure[row, c("score")] <- round(sum(master_df_final_group_measure[row, 1:n]*mean_weights)/length(mean_weights), 3)
+  }
+
+
+# selecting the score measures
+group_score <- master_df_final_group_measure[, c("master_df_final.Provider.ID", "score")]
+colnames(group_score) <- c("Provider.ID", "saftey_score")
+return(group_score)
+
+}
+
 ```
 ## 2 patient_experience Group
-## Latent Variable model
+
 ```{r}
 # safety of care
 zvar_patient_exp <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
@@ -965,58 +1103,40 @@ zvar1 <- which(names(master_df_imputed_final) %in% zvar_patient_exp)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 patient_experience_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
-head(patient_experience_group)
-plot(density(patient_experience_group))
 ```
 
 
 ## Patient experience latent model
 
 ```{r}
-# Applying the latent view factor analysis
-nfactors(patient_experience_group,rotate = "varimax",fm = "ml",pch = 16,use = "complete") 
-fa.parallel(x = patient_experience_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1)
+# Calling the user-defined function used to create the scores and latent view modelling
+
+patient_experience_group_score <- f_group_scores(patient_experience_group)
+colnames(patient_experience_group_score)[2] <- "patient_exp_score"
+str(patient_experience_group_score)
 ```
-
-```{r}
-
-# there are five factors that explain the variance between the groups
-
-patient_exp_factor_anal <- fa(patient_experience_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml",n.iter = 5)
-patient_exp_factor_anal$loadings
-patient_exp_factor_anal$score.cor
-rowMeans(as.data.frame(patient_exp_factor_anal$scores))*rescale(patient_experience_group)
-rowMeans(patient_exp_factor_anal$loadings)
-patient_experience_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              patient_exp = rowMeans(as.data.frame(patient_exp_factor_anal$scores)))
-```
-
 
 ## 3 readmission group
-## Latent Variable model
 ```{r}
 # readmission
 zvar_readm <- c("Provider.ID","READM_30_AMI","READM_30_CABG","READM_30_COPD","READM_30_HF","READM_30_HIP_KNEE","READM_30_HOSP_WIDE","READM_30_PN","READM_30_STK")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar_readm)
 
+# multiply the measure scores with direction to indicate the type of measure. timeliness, readmission, mortality
+direction <- -1  
+
 # scaling the patient experience group and winsoring between +/- 3Sigma
 readmission_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) *direction
-plot(density(readmission_group))
 ```
 
-```{r}
-# Applying the latent view factor analysis to identify the factors in the readmission group
-nfactors(readmission_group) 
-fa.parallel(x = readmission_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
-```
+## Computing readmission group latent model
 
 ```{r}
-# First five factors that explain the maximum variance between the groups
-readmission_group_factor_anal <- fa(readmission_group,nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
-readmission_group_factor_anal
+# Calling the user-defined function used to create the scores and latent view modelling
 
-readmission_group_score <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              readmission_score = rowMeans(as.data.frame(readmission_group_factor_anal$scores)))
+readmission_group_score <- f_group_scores(readmission_group)
+colnames(readmission_group_score)[2] <- "readm_score"
+head(readmission_group_score)
 ```
 
 ## 4 mortality group
@@ -1028,28 +1148,17 @@ zvar1 <- which(names(master_df_imputed_final) %in% zvar_mort)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 mortality_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
-plot(density(mortality_group))
 ```
 
-### Applying the Latent Variable Model # Factor analysis
-```{r}
-# Applying the latent view factor analysis
-nfactors(mortality_group) 
-fa.parallel(x = mortality_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
-
-
-```
+## Computing mortality group latent model
 
 ```{r}
-# First three factors that explain the maximum variance between the groups
-# Parllel analysis suggest = 3 factors that explains the common variance
-mortality_group_factor_anal <- fa(mortality_group,nfactors = 1,rotate = "varimax",scores = "regression",fm = "ml")
-mortality_group_factor_anal
+# Calling the user-defined function used to create the scores and latent view modelling
 
-mortality_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              mortality_score = rowMeans(as.data.frame(mortality_group_factor_anal$scores)))
+mortality_group_score <- f_group_scores(mortality_group)
+colnames(mortality_group_score)[2] <- "mort_score"
+head(mortality_group_score)
 ```
-
 
 ## 5. Process Group 4% - Effectiveness Group
 
@@ -1060,28 +1169,16 @@ zvar1 <- which(names(master_df_imputed_final) %in% zvar_eff)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
 effectiveness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
-plot(density(effectiveness_group))
-
 ```
 
-
-### LVM - effectiveness group
-
-```{r}
-# Applying the latent view factor analysis
-nfactors(effectiveness_group) 
-fa.parallel(x = effectiveness_group,fm = "minres",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
-
-```
-
-- parallel factor analysis, eight factors that explain the maximum variance between the groups, 
--- applying the factor analysis
+## Computing Effectiveness group latent model
 
 ```{r}
-effectiveness_group_factor_anal <- fa(effectiveness_group,nfactors = 3,rotate = "varimax",scores = "regression",fm = "ml")
-effectiveness_group_factor_anal
-effectiveness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              effectiveness_score = rowMeans(as.data.frame(effectiveness_group_factor_anal$scores)))
+# Calling the user-defined function used to create the scores and latent view modelling
+
+effectiveness_group_score <- f_group_scores(effectiveness_group)
+colnames(effectiveness_group_score)[2] <- "eff_score"
+head(effectiveness_group_score)
 ```
 
 ## 6 timeliness Group
@@ -1091,26 +1188,21 @@ zvar1 <- which(names(master_df_imputed_final) %in% zvar_tim)
 
 # scaling the timeliness between +/1 3Sigma and winsorizing the scores
 timeliness_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
-plot(density(timeliness_group))
+dim(timeliness_group)
 ```
 
-### LVM - timelines group
+
+## Computing timeliness group latent variable model
 
 ```{r}
-# Applying the latent view factor analysis
-nfactors(timeliness_group) 
-fa.parallel(x = timeliness_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+# Calling the user-defined function used to create the scores and latent view modelling
+
+timeliness_group_score <- f_group_scores(timeliness_group)
+colnames(timeliness_group_score)[2] <- "timeliness_score"
+head(timeliness_group_score)
 ```
---  First five factors that explain the maximum variance between the group measures
 
-```{r}
 
-timeliness_group_factor_anal <- fa(timeliness_group,nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
-timeliness_group_factor_anal
-
-timeliness_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              timeliness_score = rowMeans(as.data.frame(timeliness_group_factor_anal$scores)))
-```
 
 ## 7 medical imagine efficiency group
 
@@ -1120,143 +1212,498 @@ zvar_imag <- c("Provider.ID","OP_10","OP_11","OP_13","OP_14","OP_8")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar_imag)
 
 # scaling the patient experience group and winsoring between +/- 3Sigma
-medical_imaging_efficiency_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
-plot(density(medical_imaging_efficiency_group))
+imaging_efficiency_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
 ```
 
+## Computing Imagining Efficiency group latent variable model
 
 ```{r}
-# Applying the latent view factor analysis
-nfactors(medical_imaging_efficiency_group) 
-fa.parallel(x = medical_imaging_efficiency_group,fm = "ml",fa = "both",plot = TRUE,n.iter = 1,sim = FALSE)
+# Calling the user-defined function used to create the scores and latent view modelling
+
+imaging_eff_group_score <- f_group_scores(imaging_efficiency_group)
+colnames(imaging_eff_group_score)[2] <- "imaging_eff_score"
+head(imaging_eff_group_score)
 ```
+## Binding the all the groups scores and preparing the final scores table.
 
 ```{r}
-# First five factors that explain the maximum variance between the groups
-imaging_eff_group_factor_anal <- fa(medical_imaging_efficiency_group[,-1],nfactors = 2,rotate = "varimax",scores = "regression",fm = "ml")
-imaging_eff_group_factor_anal
-
-medical_imaging_group_scores <- data.frame(Provider.ID = master_df_imputed_final$Provider.ID,
-                                              imaging_eff = rowMeans(as.data.frame(imaging_eff_group_factor_anal$scores)))
-
+m1 <- merge(saftey_group_score, patient_experience_group_score, by="Provider.ID", all=T)
+m2 <- merge(m1, readmission_group_score, by="Provider.ID", all=T)
+m3 <- merge(m2, mortality_group_score, by="Provider.ID", all=T)
+m4 <- merge(m3, timeliness_group_score, by="Provider.ID", all=T)
+m5 <- merge(m4, effectiveness_group_score, by="Provider.ID", all=T)
+group_scores <- merge(m5, imaging_eff_group_score, by="Provider.ID", all=T) 
+head(group_scores)
+dim(group_scores)
 ```
 
-
-## binding the all the groups scores and preparing the final scores table.
+## Computing the final scores
 Adding the weightages specified by the CMS
-The outcome groups have 22% weightage
-Process groups have 4% weightage
+- The outcome groups have 22% weightage, that is Patient Experience,Saftey of Care, Readmission, and Mortality
+- Process groups have 4% weightage, that is timeliness, effectiveness measures and imaging efficiency measures
 
 ```{r}
 out_grp_weight = 0.22
 process_group_weight = 0.04
-final_scores <- cbind(Provider.ID=patient_experience_group_scores[,1], 
-                      patient_exp =patient_experience_group_scores[,-1]*out_grp_weight,
-                      safe_of_care=safety_of_care_group_scores[,-1]* out_grp_weight,
-                      readmission=readmission_group_score[,-1]*out_grp_weight,
-                      mortality=mortality_group_scores[,-1]*out_grp_weight,
-                      timeliness = timeliness_group_scores[,-1]*process_group_weight,
-                      effectiveness_score = effectiveness_group_scores[,-1]*process_group_weight,
-                      imaging_eff = medical_imaging_group_scores[,-1]*process_group_weight)
 
-pairs.panels(final_scores[,-c(1,9)])
-# doesn't indicate strong correlation between the groups.
+weights <- c(imaging_eff = process_group_weight, 
+             timeliness = process_group_weight,
+             effectivesss = process_group_weight,
+             mortality = out_grp_weight, 
+             safety = out_grp_weight, 
+             effectiveness = out_grp_weight,
+             experience = out_grp_weight, 
+             readmission = out_grp_weight, 
+             timeliness = out_grp_weight)
+  
+
+# There are missing scores in group_scores. For example, for Provider.ID=10007, Saftey, readm, mortality, effectiveness and imaging scores are missing
+# Therefore, patient_exp = 22%, timeliness = 4% adds to 26%, the remaining weights add up to 74%. Thus, the reproportioned weights will be 
+# c(mortality = 0.22/0.74, effectivenss = 0.04/0.74, readmission = 0.22/0.74,Safety = 0.22/0.74, imaging = 0.04/0.7 )
+
+group_scores$final_score <- 100
+
+
+for (row in 1:nrow(group_scores)) {
+  if (sum(is.na(group_scores[row, -1])) > 0) {    # if NAs are found in the group_scores
+    invalid_indices = which(is.na(group_scores[row, -1])) # get the indices where NAs are found
+    s = sum(weights[-invalid_indices]) # sum the scores' weights where the are scores are found
+    reproportioned_weights <- weights[-invalid_indices]/s # reproportion the weights where indices are found
+    #print(weights[-invalid_indices])
+    #print(reproportioned_weights)
+    print(sum(weights[-invalid_indices]*reproportioned_weights)) # product the
+    group_scores$final_score[row] <- sum(group_scores[row, -1][-invalid_indices]*reproportioned_weights)
+  }
+  
+  else {
+    group_scores$final_score[row] <- sum(group_scores[row, -1]*weights)
+  }
+}
+
+# The group scores are the final scores
+final_scores <- group_scores[, 1:ncol(group_scores)] 
+dim(final_scores)
 
 ```
 
+# Clustering the final scores: 
+- Applying K-means clustering algorithm to the final scores
+
 
 ```{r}
-# K-means clustering algorithm to the dataset
-# applying the Clustering Algorithm
-
-# logic to identify the knee
-n_clusters <- 50
-
-# initializing the r_squared vector
-r_squared <- rnorm(n_clusters)
-
 # clearing the garbage collector
 gc()
 
-for(i in 1:n_clusters) {
-  # clustering the final scores nstart = 50 , iter.max = 50
-  kmeans_clustering <- kmeans(x = final_scores[,-1],centers = i,nstart = 50,iter.max = 50,algorithm="Hartigan-Wong")
-  
-  # r_squared is the ratio of betweenss/totalss
-  r_squared[i] <- (kmeans_clustering$betweenss)/(kmeans_clustering$totss)
-  }
+# for(i in 1:n_clusters) {
+#   # clustering the final scores nstart = 50 , iter.max = 50
+#   kmeans_clustering <- kmeans(x = final_scores[,-1],centers = i,nstart = 50,iter.max = 50,algorithm="Hartigan-Wong")
+#   # r_squared is the ratio of betweenss/totalss
+#   r_squared[i] <- (kmeans_clustering$betweenss)/(kmeans_clustering$totss)
+#   }
 
-plot(r_squared)
+#plot(r_squared)
 
 # with 5 clusters
-kmeans_clustering <- kmeans(x = final_scores[,-1],centers = 5,iter.max = 50L,nstart = 50)
+kmeans_clustering <- kmeans(x = final_scores$final_score,centers = 5,nstart = 100)
 
 # Assigning clusters to the final_scores
 final_scores <- as.data.frame(final_scores)
 final_scores$rating_clster <- as.factor(kmeans_clustering$cluster)
 
-final_scores %>% group_by(rating_clster) %>% summarise(count_rws = n()) %>% mutate(total_rows = sum(count_rws),count_rws*100/total_rows)
+# summarising the clusters
+cluster_summary <-  final_scores %>% group_by(rating_clster) %>% summarise(mean_score = mean(final_score) ,cluster_count = n()) %>% 
+  mutate(percent = cluster_count*100/sum(cluster_count))
+cluster_summary
+
+# we now need to reassign the cluster ratings according to the average rating
+str(cluster_summary)
+
+# swap the 1st element with 5, 2nd with 4, 3rd with 3, 4th with 2, 5th with 1
+# In general, in 1:5, swap the ith element with (5-i + 1) 
+
+# 5 - which(f$cluster_id == 3) + 1
+# 5 - which(f$cluster_id == 1) + 1
+
+# Resetting the clusters
+for (row in 1:nrow(final_scores)) {
+  id = final_scores$rating_clster[row] 
+  final_scores$new_cluster_id[row] = 5 - which(cluster_summary$rating_clster == id) + 1 # # swap x with 5 - which(f$cluster_id == x) + 1
+}
+
+
+final_scores %>% group_by(new_cluster_id) %>% 
+  summarise(avg_score = mean(final_score)) %>%
+  arrange(desc(avg_score))
+
+final_scores$new_cluster_id <- as.factor(final_scores$new_cluster_id)
+summary(final_scores[,c(10,11)])
+head(final_scores)
+```
+
+
+```{r}
+## comparing scores across star ratings ####
+ggplot(final_scores, aes(x = factor(as.character(new_cluster_id)), y=final_score*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("final score") + theme_minimal() + 
+  scale_y_continuous(breaks=100*seq(-0.4, 0.4, 0.05))
 
 ```
+
+```{r}
+melt(data = final_scores[,-1],variable.name = "measure") %>%
+  ggplot(aes(new_cluster_id,value*100)) + geom_boxplot(na.rm = T) +
+  facet_wrap(facets = ~measure,scales = "free",ncol = 3) +
+  xlab("Star rating") + ylab("Score") + theme_minimal() 
+```
+
+
+# star_rating_validation
+
+
+```{r}
+# merging the general_info_final with final scores
+
+final_scores_merged <- merge(final_scores, general_info_final, by="Provider.ID", all=T)
+head(final_scores_merged)
+final_scores_merged$new_cluster_id <- as.character(final_scores_merged$new_cluster_id)
+str(final_scores_merged)
+# imputing the missing NA records in the new_cluster_id with "Not Available"
+final_scores_merged$new_cluster_id[which(is.na(final_scores_merged$new_cluster_id))] <- "Missing"
+
+# converting the cluster id to factor
+final_scores_merged$new_cluster_id <- factor(final_scores_merged$new_cluster_id)
+summary(final_scores_merged$new_cluster_id)
+
+# confusion matrix
+table(final_scores_merged$new_cluster_id, final_scores_merged$Hospital.overall.rating)
+confusionMatrix(final_scores_merged$new_cluster_id, final_scores_merged$Hospital.overall.rating)
+```
+
+# Provider Analysis
+
+```{r}
+head(group_scores)
+# comapring provider's overall score with
+ggplot(group_scores, aes(x=1, y=final_score))+geom_boxplot()
+
+```
+
+```{r}
+# provider's score
+final_scores_merged[which(final_scores_merged$Provider.ID == 140010),]
+```
+
+```{r}
+#plotting the box plot
+ggplot(group_scores, aes(x=1, y=final_score)) + geom_boxplot(na.rm=TRUE) + 
+  ylab("Final Score") + xlab(NULL) + geom_hline(yintercept= 676, col="red") + ggtitle("Provider Score") + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+
+final_scores_merged %>% group_by(new_cluster_id) %>%
+  summarise(avg_final_score = mean(final_score, na.rm = T), avg_mort_scr = mean(mort_score, na.rm = T), 
+            avg_saf_scr = mean(saftey_score, na.rm = T),avg_eff_scr = mean(eff_score, na.rm = T), 
+            avg_read_scr = mean(readm_score, na.rm = T),avg_tim_scr = mean(timeliness_score, na.rm = T), 
+            avg_img_scr = mean(imaging_eff_score, na.rm=T), avg_exp_scr = mean(patient_exp_score, na.rm=T))
+```
+
+```{r}
+# Viewing scores of the given provider
+final_scores_merged[which(final_scores_merged$Provider.ID == 140010),]
+```
+
+```{r}
+# plotting group level scores with rating
+group_scores_merged <- merge(group_scores, final_scores, by="Provider.ID")
+head(final_scores_merged)
+
+```
+
+```{r}
+#install.packages("cowplot")
+library(cowplot)
+
+ggplot(final_scores, aes(x=factor(as.character(new_cluster_id)), y=final_score*100)) + geom_boxplot(na.rm=TRUE) + ylab("final score") + 
+  scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank())
+
+# mortality
+plot.m <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=mort_score*100)) + 
+  geom_boxplot(na.rm=TRUE) + ylab(label = "mortality score") + scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+plot.m
+
+# readmission
+plot.r <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=readm_score*100)) + geom_boxplot(na.rm=TRUE) +
+   ylab("readmission score") + scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.r
+
+# safety
+plot.s <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=saftey_score*100)) + geom_boxplot(na.rm=TRUE) +
+   ylab("safety score") + scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.s
+
+# effectiveness
+plot.eff <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=eff_score*100)) + geom_boxplot(na.rm=TRUE) +
+   ylab("effectiveness score") + scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.eff
+
+# experience
+plot.exp <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=patient_exp_score*100)) + geom_boxplot(na.rm=TRUE) +
+   ylab("experience score") + 
+  scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.exp
+
+# timeliness
+plot.t <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=timeliness_score*100)) + 
+  geom_boxplot(na.rm=TRUE) +
+   ylab("timeliness score") + 
+  scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.t
+
+# medical
+plot.med <- ggplot(final_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=imaging_eff_score*100)) + 
+  geom_boxplot(na.rm=TRUE) + ylab("medical score") + 
+  scale_y_continuous(breaks = 100*seq(-0.4, 0.4, 0.05)) + 
+  theme(plot.title = element_text(size = 10),
+        axis.title.x = element_blank(),axis.title.y = element_text(size = 8),axis.text.x = element_text(size = 8),
+        axis.text.y = element_blank(),axis.ticks.y = element_blank())
+#plot.med
+
+p.grid <- plot_grid(plot.r, plot.exp, plot.m, plot.s,
+          plot.t, plot.eff, plot.med,
+          labels=c("readmission", "experience", "mortality", "safety",  "timeliness",
+                   "effectiveness", "medical"),
+          ncol = 3, nrow = 3,
+          label_size = 8,hjust = -2)
+
+p.grid
+# 
+# final
+# 
+# melt(data = final_scores[,-1],variable.name = "measure") %>%
+#   ggplot(aes(new_cluster_id,value*100)) + geom_boxplot(na.rm = T) + 
+#   #geom_hline(aes(yintercept = final_scores_merged[which(final_scores_merged$Provider.ID == 140010),])) +
+#   facet_wrap(facets = ~measure,scales = "free",ncol = 3) + 
+#   xlab("Star rating") + ylab("Score") + theme_minimal() 
+```
+
+```{r}
+provider.grid <- plot_grid(plot.r + geom_hline(yintercept=6, col="red"), 
+                    plot.s + geom_hline(yintercept=-4.4, col="red"),
+                    plot.exp + geom_hline(yintercept=-1.5, col="red"),
+                    plot.m + geom_hline(yintercept=26.9, col="red"),
+                    plot.t + geom_hline(yintercept=4.2, col="red"),
+                    plot.eff + geom_hline(yintercept=3.8, col="red"),
+                    plot.med + geom_hline(yintercept=4.6, col="red"),
+          labels=c("readmission", "safety", "experience", "mortality", "timeliness", 
+                   "effectiveness", "medical"), 
+          ncol = 3, nrow = 3)
+
+provider.grid 
+
+```
+```{r}
+grid_low <- plot_grid(plot.s + geom_hline(yintercept=-4.4, col="red")+ggtitle("Safety"),
+                    plot.exp + geom_hline(yintercept=-1.5, col="red")+ggtitle("Experience"))
+grid_low 
+
+grid_med <- plot_grid(plot.r + geom_hline(yintercept=6, col="red")+ggtitle("Readmission"),
+                      plot.m + geom_hline(yintercept=26.9, col="red")+ggtitle("Mortality"),
+                      plot.t + geom_hline(yintercept=4.2, col="red")+ggtitle("Timeliness"),
+                    plot.eff + geom_hline(yintercept=3.8, col="red")+ggtitle("Effectiveness"),
+                    plot.med + geom_hline(yintercept=4.6, col="red")+ggtitle("Medical"),
+          ncol = 3)
+grid_med
+
+```
+-  On comparing the average scores of groups with the provider's score, we find that:
+-  1. The final score is higher than the average score for rating=4 but lower than for rating=5
+-  2. Mortality score is better than average for rating=5
+-  3. Safety score is between the avg score for rating = 2 and 1
+-  4. Effectiveness score is better than average for rating=5
+-  5. Readmissions score is between avg of ratings 3 and 4
+-  6. Timeliness score is better than average for rating=5
+-  7. Medical score is better than average for rating=5
+-  8. Experience score is between avg of ratings 2 and 3
+
+- Overall, the rating is low because of a very low safety score (lesser than avg for rating=2), 
+- a low experience score and (between the avg for ratings 2 and 3) and (both are 22% weightage groups)
+
+
+# Compare the provider's score with the overall averages
+
+```{r}
+mean_scores <- round(sapply(group_scores[2:9], function(x) mean(x, na.rm = T)), 2)
+mean_scores
+group_scores[which(group_scores$Provider.ID == 140010),][2:9]
+
+# Can see that the safety and experience scores of the provider are lesser than the respective averages
+plot.s + geom_hline(yintercept=-4.4, col="red")
+plot.exp + geom_hline(yintercept=-1.5, col="red")
+
+```
+
+
+# Exploring further into safety and experience scores (measure wise) safety
+
+```{r}
+
+safety_scores <- data.frame(Provider.ID = master_df_imputed_final[,1],safety_of_care_group)
+head(safety_scores)
+
+# safety scores of the provider
+avg_safety = round(safety_scores[which(safety_scores$Provider.ID == 140010),][3:ncol(safety_scores)], 3)
+
+# comparing with the average safety scores
+provider_safety = round(sapply(safety_scores[, -1], function(x) mean(x, na.rm = T)), 3)
+
+head(rbind(avg_safety, provider_safety))
+
+```
+
+
+# Hosptial Safetey - -- Provider Analysis
+
+```{r}
+# merging safety scores with hospital ratings
+safety_scores_merged <- merge(safety_scores, final_scores, by="Provider.ID")
+
+plot.hai_4 <- ggplot(safety_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=HAI_4_SIR*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("HAI_4 score") + theme_minimal() 
+plot.hai_4
+
+# Observation: HAI_4 score of the provider (0.00) is lower than the median scores for ratings 2, 3, 4, 5
+plot.hai_5 <- ggplot(safety_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=HAI_5_SIR*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("HAI_5 score") + theme_minimal() 
+plot.hai_5
+
+```
+
+- HAI_2, HAI_1, HAI_3, HAI_6 scores of the provider are better than avg
+- But HAI_4 and HAI_5 are lower than average
+- HAI_4 is Surgical Site Infection from abdominal hysterectomy (SSI: Hysterectomy)
+- HAI_5 is Methicillin-resistant Staphylococcus Aureus (MRSA) Blood Laboratory-identified Events (Bloodstream infections)
+- *Conclusions* - Improviing the HAI 4 and HAI_5 scores may improve the overall score rating.
+
+
+
+# 2. Patient experience- -- Provider Analysis
+- Exploring further into safety and patient experience scores (measure wise) 
+
+```{r}
+experience_scores <- data.frame(Provider.ID = master_df_imputed_final[,1],patient_experience_group)
+
+# safety scores of the provider
+avg_experience = round(experience_scores[which(experience_scores$Provider.ID == 140010),][3:ncol(experience_scores)], 3)
+
+# comparing with the average safety scores
+provider_experience = round(sapply(experience_scores[, -1], function(x) mean(x, na.rm = T)), 3)
+head(rbind(avg_experience, provider_experience))
+
+```
+
+ we  know that within experience, H_COMP_1_LINEAR_SCORE, H_HSP_RATING_LINEAR_SCORE,
+- H_COMP_7_LINEAR_SCORE, H_COMP_3_LINEAR_SCORE, H_COMP_4_LINEAR_SCORE, 
+- H_COMP_5_LINEAR_SCORE, H_RECMND_LINEAR_SCORE are the most imp measures
+
+- *Observations:*
+- H_HSP_RATING_LINEAR_SCORE, H_RECMND_LINEAR_SCORE, H_CLEAN_LINEAR_SCORE are better than the National avg
+- H_HSP_RATING is overall hospital rating linear mean score
+- H_RECMND is Recommend hospital - linear mean score
+- H_CLEAN is Cleanliness - linear mean score
+*Conclusions:* - Improving the H_COMP_1 H_COMP_2 H_COMP_3 H_COMP_4 H_COMP_5 H_COMP_6 H_COMP_7 H_QUIET will improve the overall rating
+
+
+```{r}
+
+# merging safety scores with hospital ratings
+experience_scores_merged <- merge(experience_scores, final_scores, by="Provider.ID")
+
+plot.hsp <- ggplot(experience_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=H_HSP_RATING*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("H_HSP_RATING score") + theme_minimal() 
+plot.hsp
+
+# Observation: HSP_RATING score of the provider (0.00) is lower than the 25th percentile of rating=4
+plot.recmd <- ggplot(experience_scores_merged, aes(x=factor(as.character(new_cluster_id)), y=H_RECMND*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("H_RECMND score") + theme_minimal() 
+plot.recmd
+# H_RECMND is near the 25th percentile of rating=4
+
+plot.clean <- ggplot(experience_scores_merged, aes(x=factor(as.character(new_cluster_id)), y = H_CLEAN*100)) + geom_boxplot(na.rm=TRUE) + 
+  xlab("star rating") + ylab("H_CLEAN score") + theme_minimal() 
+plot.clean
+# H_CLEAN of 0 is comparable to the median cleanliness score for rating=3 
+```
+
+#3 Readmission -- Provider Analysis
+
+```{r}
+readm_scores <- data.frame(Provider.ID = master_df_imputed_final[,1],readmission_group)
+
+# readm scores of the provider
+avg_readm = round(readm_scores[which(readm_scores$Provider.ID == 140010),][3:ncol(readm_scores)], 3)
+
+# comparing with the average readm scores
+provider_readm = round(sapply(readm_scores[, -1], function(x) mean(x, na.rm = T)), 3)
+
+head(rbind(avg_readm, provider_readm))
+```
+- The measures READM_30_CABG, READM_30_CABG are lower than the national average. However, Readm_30 has scores higher than the national average. 
+
+
+#4 Mortality group -- Provider Analysis
+
+```{r}
+mortality_scores <- data.frame(Provider.ID = master_df_imputed_final[,1],mortality_group)
+
+# readm scores of the provider
+avg_mort = round(mortality_scores[which(mortality_scores$Provider.ID == 140010),][3:ncol(mortality_scores)], 3)
+
+# comparing with the average readm scores
+provider_mort = round(sapply(mortality_scores[, -1], function(x) mean(x, na.rm = T)), 3)
+
+head(rbind(avg_mort, provider_mort))
+```
+
+# Average score is higher than the national average for the Mortality.
+
+- *Summary of provider analysis:*
+- The provider has low scores in the groups safety and patient-experience and readmission and this pulled the over.rating of the hosptial downs.
+
+```{r}
+provider.grid
+
+# The safety score of provider is -4.4 (on the scale of this plot)
+plot.s + geom_hline(yintercept=-4.4, col="red")
+
+# The experience score is -1.5 (on this scale)
+plot.exp + geom_hline(yintercept=-1.5, col="red")
+```
+
+- within safety, HAI_4 and HAI_5 scores are lower than the average scores of these measures
+- within experience, H_HSP_RATING, H_RECMND, H_CLEAN are worse than avg
 
 
  
-```{r}
-
-library(caret)
-str(final_scores)
-str(master_df_final$Hospital.overall.rating)
-
-# comparing the hospial ratings of random forest and clustering  
-confusionMatrix(data = factor(predict_master_df$Hospital.overall.rating),reference = factor(final_scores$rating_clster))
-
-table(predict_rf,final_scores$rating_clster)
-length(factor(predict_rf))
-```
-
-```{r}
-model_rf$importance
-```
-
-# COnfirmatory Factor analysis Using Lavaan
-
-```{r}
-# library(lavaan)
-# 
-# cms.rating.model <- ' zsafe =~ COMP_HIP_KNEE + PSI_90_SAFETY + HAI_1_SIR + HAI_2_SIR + HAI_3_SIR + HAI_4_SIR + HAI_5_SIR + HAI_6_SIR
-# zpatient =~ H_CLEAN + H_COMP_1 + H_COMP_2 + H_COMP_3 + H_COMP_4 + H_COMP_5 + H_COMP_6 + H_COMP_7 + H_HSP_RATING + H_QUIET + H_RECMND
-# zread =~ READM_30_AMI + READM_30_CABG + READM_30_COPD + READM_30_HF + READM_30_HIP_KNEE + READM_30_HOSP_WIDE + READM_30_PN + READM_30_STK
-# zmort =~ MORT_30_AMI + MORT_30_CABG + MORT_30_COPD + MORT_30_HF + MORT_30_PN + MORT_30_STK + PSI_4_SURG_COMP
-# zimag =~ OP_10 + OP_11 + OP_13 + OP_14 + OP_8
-# ztim =~ ED_1b + ED_2b + OP_18b + OP_20 + OP_21 + OP_3b + OP_5
-# zeff =~ CAC_3 + IMM_2 + IMM_3_OP_27 + OP_22 + OP_23 + OP_29 + OP_30 + OP_4 + PC_01 + STK_1 + STK_4 + STK_6 + STK_8 + VTE_1 + VTE_2 + VTE_3 + VTE_5 + VTE_6 '
-# 
-# 
-# # model fit
-# cms_fit <- lavaan::cfa(model = cms.rating.model, data = master_df_imputed_final[,-1])
-# cms_fit <- lavaan::sem(model = cms.rating.model, data = master_df_imputed_final[,-1])
-# summary(cms_fit)
-# lavInspect(cms_fit,"optim.gradient")
-# paste(zvar_mort[-1],collapse = " + ")
-# 
-
-```
-
-Part 3 - Recommendations for Hospitals
-
-Suppose you work for a healthcare consulting company. The hospital with Provider ID = 140010 (EVANSTON HOSPITAL) is your client. 
-
-The hospital’s current star rating is 3 and it wants to improve it to at least 4 next year. The data required for this analysis is already available to you. 
-
-Using your understanding of the star rating system, recommend ways to improve the rating. The structure you follow for this part is up to you. 
-
-
-```{r}
-
-master_df_final[which(master_df$Provider.ID %in% "140010"),]
-
-final_scores[which(final_scores$rating_clster %in% "4"),]
-
-```
-
-
