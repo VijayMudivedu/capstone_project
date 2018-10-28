@@ -862,7 +862,7 @@ tuning_grid_rf <- expand.grid(.mtry = round(sqrt(ncol(train_df[,-1]))),ntree = s
 
 # training the random forest with training dataset
 model_rf_no_na <- randomForest(Hospital.overall.rating ~.,
-                         data = train_df,
+                         data = train_df[,-2],
                          trControl = train_control_rf,
                          tuneGrid = tuning_grid_rf,
                          metric = "auc",
@@ -873,11 +873,14 @@ model_rf_no_na
 ```
 
 ```{r}
-vars_predict <- setdiff(x = names(train_df[,-1]),y = "Hospital.overall.rating")
-predict_rf <- stats::predict(object = model_rf_no_na,test_df[vars_predict])
+vars_predict <- setdiff(x = names(test_df[,-c(2)]),y = "Hospital.overall.rating")
+predict_rf_test <- stats::predict(object = model_rf_no_na,test_df[vars_predict])
 # Confusion Matrix
-confusionMatrix(predict_rf,test_df$Hospital.overall.rating)
+confusionMatrix(predict_rf_test,test_df$Hospital.overall.rating)
+
 ```
+
+* Random Forest Algorithm generated an accuracy of 74%.
 
 # Predicting the rating of missing Ratings using the randomForest
 ```{r}
@@ -893,7 +896,6 @@ master_df_model_Missing$Hospital.overall.rating <- predicted_rating_missing_Valu
 # combining the missing and no missing rows
 predict_master_df <- rbind(master_df_model_no_Missing,master_df_model_Missing) 
 ```
-
 
 Groups identified so far are:
 Outcome Groups:
@@ -917,7 +919,6 @@ zvar1 <- which(names(master_df_imputed_final) %in% zvar_saftey)
 safety_of_care_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
 
 ```
-
 
 ## Applying Latent Variable Model 
 
@@ -952,15 +953,15 @@ safety_care_fact_anal <- fa(r = safety_of_care_group,rotate = rotate,fm = fm,sco
 # using the loadings
 safety_loadings <- safety_care_fact_anal$loadings
 cor.plot(safety_of_care_group,stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,upper = F,
-         xlas = 2,cex.axis = 0.6,main = "Patient Safety group measure correlation")
+         xlas = 2,cex.axis = 0.6,main = "Safety of Care measures correlation")
 
 # computing the mean loading
-patient_safety_loading <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
+safety_loading <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
 
 # comparing with correlations
 cor_matrix <- data.frame(cor(safety_of_care_group))
 cor_matrix <- data.frame(sapply(cor_matrix, function(x) round(mean(x), 2)))
-cor_matrix <- cbind(cor_matrix, round(patient_safety_loading, 2))
+cor_matrix <- cbind(cor_matrix, round(safety_loading, 2))
 colnames(cor_matrix) <- c("avg_correlation", "mean_factor_loading")
 cor_matrix
 
@@ -975,14 +976,14 @@ master_df_final_safety_care_measures <- cbind(master_df_final$Provider.ID,master
 
 # filtering the indices with containing NA score measures <= 3 
 valid_indices <- apply(master_df_final_safety_care_measures[,-1],1,function(x) sum(is.na(x))) < 3
-master_df_final_safety_care_measures <- master_df_final_safety_care_measures[valid_indices==TRUE,] 
+master_df_final_safety_care_measures <- master_df_final_safety_care_measures[valid_indices == TRUE,] 
 
 # Num of Providers with less than 3 measures having NAs in the master_df_final
 table(valid_indices)
 
 # In order to calculate scores,imputing the missing values in the scores variable
 impute_na <- function(measure){
-  measure[which(is.na(measure))] <- median(measure, na.rm=T)
+  measure[which(is.na(measure))] <- median(measure, na.rm = TRUE)
   return(measure)
 }
 
@@ -999,17 +1000,13 @@ master_df_final_safety_care_measures$score <- apply(sweep(master_df_final_safety
 saftey_group_score <- master_df_final_safety_care_measures[, c("master_df_final.Provider.ID", "score")]
 colnames(saftey_group_score) <- c("Provider.ID", "saftey_score")
 head(saftey_group_score)
-plot(density(saftey_group_score$saftey_score))
+plot(density(saftey_group_score$saftey_score),main = "Safety Group Score" )
 ```
 
 ### Generic function that would convert the remaining groups to group scores
 
-
-- we need to do this for 6 other groups, so
-- let's put this entire code in a function
-- it takes in the main group measures and the measure correlation as input
-- and returns the group scores for each hospital
-
+- To evaluate For the 6 other group, let's put this entire code in a function
+- Function takes measure_group as the input and returns the group scores for each hospital
 
 ```{r}
 
@@ -1029,25 +1026,25 @@ fm = "ml" # maximum likelihood
 rotate = "varimax" # varimax rotation to obtain maximum variance between the measons
 nfactors = n_factors
 scores = "regression"
-safety_care_fact_anal <- fa(r = group_measure,rotate = rotate,fm = fm,scores = scores,nfactors = nfactors)
+fact_anal <- fa(r = group_measure,rotate = rotate,fm = fm,scores = scores,nfactors = nfactors)
 
 # using the loadings
-safety_loadings <- safety_care_fact_anal$loadings
+safety_loadings <- fact_anal$loadings
 cor.plot(group_measure,stars = FALSE,numbers = TRUE,colors = TRUE,cex = 0.5, show.legend = FALSE,upper = F,
-         xlas = 2,cex.axis = 0.6,main = "Patient Safety group measure correlation")
+         xlas = 2,cex.axis = 0.6,main = "Group measure correlation")
 
 # computing the mean loading
-patient_safety_loading <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
+loadings <- as.vector(apply(safety_loadings[,1:nfactors],1,FUN = mean))
 
 # comparing with correlations
 cor_matrix <- data.frame(cor(group_measure))
 cor_matrix <- data.frame(sapply(cor_matrix, function(x) round(mean(x), 2)))
-cor_matrix <- cbind(cor_matrix, round(patient_safety_loading, 2))
+cor_matrix <- cbind(cor_matrix, round(loadings, 2))
 colnames(cor_matrix) <- c("avg_correlation", "mean_factor_loading")
 cor_matrix
 
 # comparing the relation between the avg correlation, mean factor loadings, mean weights
-mean_weights = round(apply(safety_care_fact_anal$weights,1,mean),3)
+mean_weights = round(apply(fact_anal$weights,1,mean),3)
 cbind(cor_matrix,mean_wghts = mean_weights)
 
 # It is clear that factor loadings are proportional to mean_weights.
@@ -1077,14 +1074,12 @@ master_df_final_group_measure <- data.frame(sapply(master_df_final_group_measure
 #                                                    MARGIN = 2, mean_weights/length(mean_weights),'*'),1,sum) %>% round(digits = 3)
 # 
 
-  
   n <- ncol(master_df_final_group_measure) 
   master_df_final_group_measure$score <- 0
   
   for (row in 1:nrow(master_df_final_group_measure)){
     master_df_final_group_measure[row, c("score")] <- round(sum(master_df_final_group_measure[row, 1:n]*mean_weights)/length(mean_weights), 3)
   }
-
 
 # selecting the score measures
 group_score <- master_df_final_group_measure[, c("master_df_final.Provider.ID", "score")]
@@ -1101,10 +1096,10 @@ return(group_score)
 zvar_patient_exp <- c("Provider.ID","H_CLEAN","H_COMP_1","H_COMP_2","H_COMP_3","H_COMP_4","H_COMP_5","H_COMP_6","H_COMP_7","H_HSP_RATING","H_QUIET","H_RECMND")
 zvar1 <- which(names(master_df_imputed_final) %in% zvar_patient_exp)
 
+direction <- -1
 # scaling the patient experience group and winsoring between +/- 3Sigma
-patient_experience_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125)
+patient_experience_group <- master_df_imputed_final[,zvar1][,-1] %>% scale() %>% winsor(trim = 0.0125) * direction
 ```
-
 
 ## Patient experience latent model
 
@@ -1246,16 +1241,8 @@ Adding the weightages specified by the CMS
 out_grp_weight = 0.22
 process_group_weight = 0.04
 
-weights <- c(imaging_eff = process_group_weight, 
-             timeliness = process_group_weight,
-             effectivesss = process_group_weight,
-             mortality = out_grp_weight, 
-             safety = out_grp_weight, 
-             effectiveness = out_grp_weight,
-             experience = out_grp_weight, 
-             readmission = out_grp_weight, 
-             timeliness = out_grp_weight)
-  
+weights <- c(safety = out_grp_weight, experience = out_grp_weight, readmission = out_grp_weight,mortality = out_grp_weight, 
+             timeliness = process_group_weight,effectivesss = process_group_weight,imaging_eff = process_group_weight)
 
 # There are missing scores in group_scores. For example, for Provider.ID=10007, Saftey, readm, mortality, effectiveness and imaging scores are missing
 # Therefore, patient_exp = 22%, timeliness = 4% adds to 26%, the remaining weights add up to 74%. Thus, the reproportioned weights will be 
@@ -1271,7 +1258,7 @@ for (row in 1:nrow(group_scores)) {
     reproportioned_weights <- weights[-invalid_indices]/s # reproportion the weights where indices are found
     #print(weights[-invalid_indices])
     #print(reproportioned_weights)
-    print(sum(weights[-invalid_indices]*reproportioned_weights)) # product the
+    print(sum(weights[-invalid_indices]*reproportioned_weights)) # adjusting the re-proportioned to indices that have "NAs"
     group_scores$final_score[row] <- sum(group_scores[row, -1][-invalid_indices]*reproportioned_weights)
   }
   
@@ -1289,19 +1276,9 @@ dim(final_scores)
 # Clustering the final scores: 
 - Applying K-means clustering algorithm to the final scores
 
-
 ```{r}
 # clearing the garbage collector
 gc()
-
-# for(i in 1:n_clusters) {
-#   # clustering the final scores nstart = 50 , iter.max = 50
-#   kmeans_clustering <- kmeans(x = final_scores[,-1],centers = i,nstart = 50,iter.max = 50,algorithm="Hartigan-Wong")
-#   # r_squared is the ratio of betweenss/totalss
-#   r_squared[i] <- (kmeans_clustering$betweenss)/(kmeans_clustering$totss)
-#   }
-
-#plot(r_squared)
 
 # with 5 clusters
 kmeans_clustering <- kmeans(x = final_scores$final_score,centers = 5,nstart = 100)
@@ -1321,22 +1298,21 @@ str(cluster_summary)
 # swap the 1st element with 5, 2nd with 4, 3rd with 3, 4th with 2, 5th with 1
 # In general, in 1:5, swap the ith element with (5-i + 1) 
 
-# 5 - which(f$cluster_id == 3) + 1
-# 5 - which(f$cluster_id == 1) + 1
-
 # Resetting the clusters
 for (row in 1:nrow(final_scores)) {
   id = final_scores$rating_clster[row] 
   final_scores$new_cluster_id[row] = 5 - which(cluster_summary$rating_clster == id) + 1 # # swap x with 5 - which(f$cluster_id == x) + 1
 }
 
-
+# check the distribution of the new clusters after the swap
 final_scores %>% group_by(new_cluster_id) %>% 
   summarise(avg_score = mean(final_score)) %>%
   arrange(desc(avg_score))
 
+# new cluster id added to the final scores data frame. after adjusting the clusters
 final_scores$new_cluster_id <- as.factor(final_scores$new_cluster_id)
 summary(final_scores[,c(10,11)])
+
 head(final_scores)
 ```
 
@@ -1344,18 +1320,28 @@ head(final_scores)
 ```{r}
 ## comparing scores across star ratings ####
 ggplot(final_scores, aes(x = factor(as.character(new_cluster_id)), y=final_score*100)) + geom_boxplot(na.rm=TRUE) + 
-  xlab("star rating") + ylab("final score") + theme_minimal() + 
+  xlab("star rating") + ylab("final score") + theme_minimal() + ggtitle("comparing scores across star ratings") +
   scale_y_continuous(breaks=100*seq(-0.4, 0.4, 0.05))
 
 ```
 
+# Distribution of ratings across different groups
+
 ```{r}
 melt(data = final_scores[,-1],variable.name = "measure") %>%
   ggplot(aes(new_cluster_id,value*100)) + geom_boxplot(na.rm = T) +
-  facet_wrap(facets = ~measure,scales = "free",ncol = 3) +
+  facet_wrap(facets = ~measure,scales = "free",ncol = 3) + ggtitle("Distribution of ratings across different groups")+
   xlab("Star rating") + ylab("Score") + theme_minimal() 
 ```
 
+5 - Rating in the final score is contributed by the Timeliness and Imaging Efficiency
+
+4 - Rating is contributed by Safety score, readmission, efficectiveness and timeliness.
+
+1- Rating is mainly due to timeliness score, Low imaging efficiency, 
+
+
+# For a 5- Star Rating the 
 
 # star_rating_validation
 
@@ -1393,13 +1379,7 @@ ggplot(group_scores, aes(x=1, y=final_score))+geom_boxplot()
 final_scores_merged[which(final_scores_merged$Provider.ID == 140010),]
 ```
 
-```{r}
-#plotting the box plot
-ggplot(group_scores, aes(x=1, y=final_score)) + geom_boxplot(na.rm=TRUE) + 
-  ylab("Final Score") + xlab(NULL) + geom_hline(yintercept= 676, col="red") + ggtitle("Provider Score") + 
-  theme(plot.title = element_text(hjust = 0.5))
 
-```
 
 ```{r}
 
@@ -1407,23 +1387,17 @@ final_scores_merged %>% group_by(new_cluster_id) %>%
   summarise(avg_final_score = mean(final_score, na.rm = T), avg_mort_scr = mean(mort_score, na.rm = T), 
             avg_saf_scr = mean(saftey_score, na.rm = T),avg_eff_scr = mean(eff_score, na.rm = T), 
             avg_read_scr = mean(readm_score, na.rm = T),avg_tim_scr = mean(timeliness_score, na.rm = T), 
-            avg_img_scr = mean(imaging_eff_score, na.rm=T), avg_exp_scr = mean(patient_exp_score, na.rm=T))
+            avg_img_scr = mean(imaging_eff_score, na.rm=T), avg_pat_exp_scr = mean(patient_exp_score, na.rm=T))
 ```
 
 ```{r}
 # Viewing scores of the given provider
 final_scores_merged[which(final_scores_merged$Provider.ID == 140010),]
 ```
-
-```{r}
 # plotting group level scores with rating
-group_scores_merged <- merge(group_scores, final_scores, by="Provider.ID")
-head(final_scores_merged)
-
-```
-
 ```{r}
-#install.packages("cowplot")
+
+# plotting group level scores with rating
 library(cowplot)
 
 ggplot(final_scores, aes(x=factor(as.character(new_cluster_id)), y=final_score*100)) + geom_boxplot(na.rm=TRUE) + ylab("final score") + 
@@ -1510,13 +1484,18 @@ p.grid
 ```
 
 ```{r}
-provider.grid <- plot_grid(plot.r + geom_hline(yintercept=6, col="red"), 
-                    plot.s + geom_hline(yintercept=-4.4, col="red"),
-                    plot.exp + geom_hline(yintercept=-1.5, col="red"),
-                    plot.m + geom_hline(yintercept=26.9, col="red"),
-                    plot.t + geom_hline(yintercept=4.2, col="red"),
+#     Provider.ID saftey_score patient_exp_score readm_score mort_score timeliness_score eff_score imaging_eff_score final_score rating_clster new_cluster_id
+# 947      140010         0.11          -238.337    1296.652     405.07         7970.751        NA           12100.4    1194.599             4              2
+#     Hospital.overall.rating
+# 947                       3
+
+provider.grid <- plot_grid(plot.r + geom_hline(yintercept=1296.7, col="red"), 
+                    plot.s + geom_hline(yintercept=-0.11, col="red"),
+                    plot.exp + geom_hline(yintercept=--238, col="red"),
+                    plot.m + geom_hline(yintercept=405, col="red"),
+                    plot.t + geom_hline(yintercept=7970, col="red"),
                     plot.eff + geom_hline(yintercept=3.8, col="red"),
-                    plot.med + geom_hline(yintercept=4.6, col="red"),
+                    plot.med + geom_hline(yintercept=12100, col="red"),
           labels=c("readmission", "safety", "experience", "mortality", "timeliness", 
                    "effectiveness", "medical"), 
           ncol = 3, nrow = 3)
@@ -1525,15 +1504,18 @@ provider.grid
 
 ```
 ```{r}
-grid_low <- plot_grid(plot.s + geom_hline(yintercept=-4.4, col="red")+ggtitle("Safety"),
-                    plot.exp + geom_hline(yintercept=-1.5, col="red")+ggtitle("Experience"))
+#     Provider.ID saftey_score patient_exp_score readm_score mort_score timeliness_score eff_score imaging_eff_score 
+# 947      140010         0.11          -238.337    1296.652     405.07         7970.751        NA           12100.4 
+
+grid_low <- plot_grid(plot.s + geom_hline(yintercept=0.11, col="red")+ggtitle("Safety"),
+                    plot.exp + geom_hline(yintercept=-238, col="red")+ggtitle("Experience"))
 grid_low 
 
-grid_med <- plot_grid(plot.r + geom_hline(yintercept=6, col="red")+ggtitle("Readmission"),
-                      plot.m + geom_hline(yintercept=26.9, col="red")+ggtitle("Mortality"),
-                      plot.t + geom_hline(yintercept=4.2, col="red")+ggtitle("Timeliness"),
+grid_med <- plot_grid(plot.r + geom_hline(yintercept=1296.5, col="red")+ggtitle("Readmission"),
+                      plot.m + geom_hline(yintercept=405, col="red")+ggtitle("Mortality"),
+                      plot.t + geom_hline(yintercept=7970, col="red")+ggtitle("Timeliness"),
                     plot.eff + geom_hline(yintercept=3.8, col="red")+ggtitle("Effectiveness"),
-                    plot.med + geom_hline(yintercept=4.6, col="red")+ggtitle("Medical"),
+                    plot.med + geom_hline(yintercept=12100, col="red")+ggtitle("Medical"),
           ncol = 3)
 grid_med
 
@@ -1560,7 +1542,7 @@ mean_scores
 group_scores[which(group_scores$Provider.ID == 140010),][2:9]
 
 # Can see that the safety and experience scores of the provider are lesser than the respective averages
-plot.s + geom_hline(yintercept=-4.4, col="red")
+plot.s + geom_hline(yintercept=-0.11, col="red")
 plot.exp + geom_hline(yintercept=-1.5, col="red")
 
 ```
